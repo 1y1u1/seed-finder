@@ -26,7 +26,7 @@ CPU 端瓶颈是 MT19937 初始化那条 **398 步串行链**（每步一次 32 
 
 GPU 擅长"多条独立串行链并排"，所以**一个 GPU 线程算一个种子**正合适。
 
-移植时的一个重要简化：`seedfinder3/seedengine.cpp` 的 `LaneBatch` 保留了
+移植时的一个重要简化：`seedfinder3/src/core/seedengine.cpp` 的 `LaneBatch` 保留了
 `head[0..131]` 整段 MT 前缀，但抽卡时下标 `k` 是逐次 `+1` 前进的，每次只用
 `head[k]` 和 `head[k+1]`。改用**滚动两词**（`a = head[k]`、`b = head[k+1]`）即可，
 寄存器占用从 132 个词降到 2 个 —— 这对 GPU 至关重要，大数组会溢出到 local memory，

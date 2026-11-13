@@ -4,7 +4,7 @@
 // 目的: 用 GPU 算 "一批 (种子, 轮次) 组合的上场表", 与 CPU 的 rowBitsBySeed
 //       逐位对比, 并测吞吐。
 //
-// 关键发现 (直接影响 GPU 实现): seedfinder3/seedengine.cpp 的 LaneBatch 保留了
+// 关键发现 (直接影响 GPU 实现): seedfinder3/src/core/seedengine.cpp 的 LaneBatch 保留了
 // head[0..kLaneHead-1] 整段 MT 初始化前缀, 但抽卡时 k 是逐次 +1 前进的, 每次只用
 // head[k] 和 head[k+1]。所以改用"滚动两词"(a=head[k], b=head[k+1])就能算, 寄存器
 // 从 132 个词降到 2 个 —— 这对 GPU 很重要, 因为大数组会溢到 local memory。
@@ -22,7 +22,7 @@
 #include <chrono>
 
 // 直接包含引擎实现, 以便调用匿名命名空间里的 rowBitsBySeed
-#include "../seedfinder3/seedengine.cpp"
+#include "../seedfinder3/src/core/seedengine.cpp"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")

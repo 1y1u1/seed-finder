@@ -17,7 +17,7 @@
 #include <vector>
 #include <chrono>
 
-#include "../seedfinder3/seedengine.cpp"
+#include "../seedfinder3/src/core/seedengine.cpp"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")

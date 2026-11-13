@@ -9,9 +9,9 @@ TEMPLATE = app
 QMAKE_CXXFLAGS_RELEASE += /O2
 QMAKE_CXXFLAGS += /utf-8
 
-INCLUDEPATH += ../seedfinder3
+INCLUDEPATH += ../seedfinder3/src/core
 
 SOURCES += gpupipe.cpp
 
-HEADERS += ../seedfinder3/seedengine.h \
-    ../seedfinder3/zombiedata.h
+HEADERS += ../seedfinder3/src/core/seedengine.h \
+    ../seedfinder3/src/core/zombiedata.h
