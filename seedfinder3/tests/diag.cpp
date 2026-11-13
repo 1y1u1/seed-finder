@@ -3,7 +3,7 @@
 //     A) 复用同一个 d_page 连续扫描 (原版 work() 的做法)
 //     B) 每个种子新建 d_page (等价于"无缓存")
 //     C) v3 WaveOracle
-#include "../../seed-finder-qt-main1.2/worker.cpp"
+#include "ref12/worker.cpp"
 #include "../seedengine.h"
 
 #include <QCoreApplication>

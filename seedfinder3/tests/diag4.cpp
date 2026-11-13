@@ -2,7 +2,7 @@
 //   A) 从 SeedCalc 逐种子还原直方图, 与 v3 直方图直接对比 (同一进程, 排除构建差异)
 //   B) 定点验证原版 d_page 的"后退一页"(t == cur - 1)分支:
 //      先把 cur 推到偶数页, 再请求 cur-1 页, 看返回的数据是否等于该页真实数据
-#include "../../seed-finder-qt-main1.2/worker.cpp"
+#include "ref12/worker.cpp"
 #include "../seedengine.h"
 
 #include <QCoreApplication>

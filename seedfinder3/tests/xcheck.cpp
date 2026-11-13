@@ -8,7 +8,7 @@
 //             T2 种子 -> 匹配波数一致 (原版 single_seed vs v3 evaluateSeed)
 //             T3 原版 r_val 扫描 vs v3 在同一批 r_val 上的暴力枚举 (枚举语义一致)
 //             T4 v3 实际检索结果 vs 暴力枚举 (连续种子, 覆盖分桶/全局条件/多规则带)
-#include "../../seed-finder-qt-main1.2/worker.cpp"
+#include "ref12/worker.cpp"
 
 #include "../seedengine.h"
 

@@ -6,7 +6,6 @@ _build/
 _build3/
 _build_static/
 _archive/
-_ssh/
 
 # ---- 编译中间产物与可执行文件 ----
 *.obj
@@ -32,7 +31,15 @@ debug/
 # ---- 运行期/临时产物 (只忽略根目录与构建目录下的截图, 源码目录里的资源要留) ----
 /*.png
 /*.txt
-/_bench/after*.txt
+
+# ---- 不进主线的目录 ----
+# _bench: 本地基准与回归工具, 只在本机用, 不上传
+# zombie_calculator-master: 第三方参考项目, 不上传
+# seed-finder-qt-main1.2: 1.2 / 2.0 版旧源码, 只在 legacy-2.0 分支上保留
+/_bench/
+/zombie_calculator-master/
+/seed-finder-qt-main1.2/
+/_ssh/
 
 # GPU 原型的源码在 gpu 分支 (main 分支只留本地编译产物, 不入库)
 /_gpu/

@@ -1,7 +1,7 @@
 // 精确定位: 原版整段扫描 (SeedCalc, 多线程) 与 v3 的逐种子差异
 //   技巧: outputSize 设成 >= 段长, 原版就会把每个 count 桶里的全部种子都存下来,
 //         于是可以还原出"每个种子 -> 匹配波数", 做逐种子比对
-#include "../../seed-finder-qt-main1.2/worker.cpp"
+#include "ref12/worker.cpp"
 #include "../seedengine.h"
 
 #include <QCoreApplication>
