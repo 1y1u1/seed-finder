@@ -1,6 +1,6 @@
 // diag5: 定位 Searcher::run 与"直接逐种子循环"的差异
 #include "ref12/worker.cpp"
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <QCoreApplication>
 

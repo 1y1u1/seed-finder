@@ -1,5 +1,5 @@
 // 临时探针: 统计每个波次出现各种僵尸的种子比例, 用来挑合理的默认条件
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <cstdio>
 

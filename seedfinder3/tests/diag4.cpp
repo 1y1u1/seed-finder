@@ -3,7 +3,7 @@
 //   B) 定点验证原版 d_page 的"后退一页"(t == cur - 1)分支:
 //      先把 cur 推到偶数页, 再请求 cur-1 页, 看返回的数据是否等于该页真实数据
 #include "ref12/worker.cpp"
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <QCoreApplication>
 
