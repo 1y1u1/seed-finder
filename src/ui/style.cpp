@@ -7,7 +7,9 @@ QString appStyleSheet()
     return QString::fromUtf8(R"QSS(
 * {
     font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
-    font-size: 12px;
+    /* 11px: 条件表行高压到 18 之后, 12px 的字会顶到格子的上下边框,
+       看起来像被切掉一截。全界面统一用 11px, 行高还能再省一点。 */
+    font-size: 11px;
     color: #111111;
 }
 
@@ -45,6 +47,8 @@ QLabel#CardTitle {
     font-size: 12px;
     font-weight: bold;
     color: #111111;
+    /* 四张卡的标题等高: 只靠字号的话, 不同 DPI 下会差 1~2px, 卡片顶边看着就不齐 */
+    min-height: 18px;
     padding: 0;
 }
 QLabel#Hint {
@@ -92,9 +96,11 @@ QPushButton {
     background: #ffffff;
     border: 1px solid #cccccc;
     border-radius: 0;
-    /* 上下内边距只给 3px: 主界面三张卡各有一行按钮,
-       每行省 4px 合起来就是 12px, 正好是压到 430 高所缺的那点。 */
-    padding: 3px 12px;
+    /* 上下内边距只给 2px, 再配一个固定的 min-height:
+       主界面三张卡各有一行按钮, 高度定死之后卡片高度才可预测,
+       窗口压到 448 才不会因为字号变化而忽高忽低。 */
+    padding: 2px 12px;
+    min-height: 20px;
     color: #222222;
 }
 QPushButton:hover {
@@ -151,7 +157,9 @@ QTableWidget {
     selection-color: #111111;
 }
 QTableWidget::item {
-    padding: 3px 4px;
+    /* 上下只留 1px: 行高压到 18 时, 3px+3px 的内边距会把 11px 的字挤掉一截,
+       看起来像文字被裁了。横向 4px 保留, 挨着列边框才不显得挤。 */
+    padding: 1px 4px;
 }
 QTableWidget::item:selected {
     background: #e4e4e4;
@@ -164,7 +172,8 @@ QHeaderView::section {
     border: none;
     border-right: 1px solid #e2e2e2;
     border-bottom: 1px solid #d8d8d8;
-    padding: 5px 4px;
+    /* 表头高度写死 20, 上下各留 2px 才够放下 11px 的字 (原来 5px 只剩 10px 可用) */
+    padding: 2px 4px;
 }
 QTableCornerButton::section {
     background: #f0f0f0;

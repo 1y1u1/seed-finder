@@ -9,6 +9,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QSpinBox>
 #include <QStyledItemDelegate>
 #include <QTableWidget>
@@ -81,9 +82,9 @@ CondDialog::CondDialog(int scene, QWidget *parent)
     // 去掉标题栏上的"这是什么?"按钮：程序没有设置任何 whatsThis 文本, 点它只会
     // 进入上下文帮助模式却没有内容可显示, 看起来像失灵
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    // 名字一列 76、四个勾选列各 46, 加边框和边距约 290, 窗口收到 320 就够。
-    // (僵尸名都是两个字, 76 已经留足; 勾选列 46 放 14px 的方框绰绰有余。)
-    setFixedWidth(320);
+    // 宽度不在这里写死: 由 rebuildTable() 按"名字列 + 四个勾选列"的实际
+    // 列宽算出来。早前写死 320, 但内容是 76 + 4×46 = 260, 加边框边距约 282,
+    // 右边就多出一条二十几像素的灰带 —— 观感上像是窗口没对齐。
     buildUi();
     rebuildTable();
 }
@@ -222,6 +223,18 @@ void CondDialog::rebuildTable()
     const int rowsH = kHeadH + m_rows.size() * kRowH + m_table->frameWidth() * 2 + 2;
     m_table->setFixedHeight(rowsH);
     adjustSize();
+
+    // 宽度同样按内容算, 不再写死: 表格各列总宽 + 边框 + 左右边距(=布局的
+    // contentsMargins), 这样右边不会多出一条灰带。滚动条宽度也加进去 ——
+    // 某些场景行数多到出滚动条时, 不然会刚好差那么十来个像素。
+    int colsW = 0;
+    for (int c = 0; c < m_table->columnCount(); ++c) colsW += m_table->columnWidth(c);
+    const QMargins m = layout()->contentsMargins();
+    int width = colsW + m_table->frameWidth() * 2 + m.left() + m.right();
+    if (m_table->verticalScrollBar()->isVisible())
+        width += m_table->verticalScrollBar()->sizeHint().width();
+    setFixedWidth(width);
+
     setFixedHeight(sizeHint().height());
 
     syncCountLimits();

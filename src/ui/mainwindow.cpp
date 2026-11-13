@@ -48,8 +48,9 @@ const int kLeftWidth = 400;
 const int kRangeColumnWidth = 88;
 
 // 出怪条件与全局条件两张表的高度统一: 表头 + 3 行可见, 再多就在表格里滚。
-// 行高与表头高都写死, 好让整窗高度降到 430 之后还塞得下 3 行。
-const int kConditionRowHeight = 16;
+// 行高 18 是下限: 11px 的字一行约 15px, 再配合 QTableWidget::item 上下各 1px
+// 的内边距, 18 刚好放得下且不切字。表头 20 同理 (上下各 2px 内边距)。
+const int kConditionRowHeight = 18;
 const int kConditionHeaderHeight = 20;
 const int kConditionTableHeight =
     kConditionHeaderHeight + 3 * kConditionRowHeight + 2 + 2;
@@ -74,19 +75,31 @@ QString bigNumber(quint64 v)
     return out;
 }
 
-QFrame *makeCard(const QString &title, QWidget *child)
+// 卡片内边距与间距: 主界面四张卡必须用同一套数字, 否则卡片顶边、按钮位置
+// 会相差 1~2px, 一排看过去就是歪的。抽成常量, 加卡片时直接引用。
+const int kCardMarginH = 8;
+const int kCardMarginV = 2;
+const int kCardSpacing = 3;
+
+// 标题行是自定义控件时走这个 (右栏那张卡的标题行里有种子输入框和按钮)
+QFrame *makeCard(QWidget *titleRow, QWidget *child)
 {
     QFrame *card = new QFrame;
     card->setObjectName("Card");
     QVBoxLayout *lay = new QVBoxLayout(card);
-    // 上下边距压到 2: 三张卡各让出 4px, 合起来就是主界面能少掉的那 12px
-    lay->setContentsMargins(8, 2, 8, 2);
-    lay->setSpacing(2);
-    QLabel *t = new QLabel(title);
-    t->setObjectName("CardTitle");
-    lay->addWidget(t);
+    lay->setContentsMargins(kCardMarginH, kCardMarginV, kCardMarginH, kCardMarginV);
+    lay->setSpacing(kCardSpacing);
+    lay->addWidget(titleRow);
     lay->addWidget(child, 1);
     return card;
+}
+
+// 标题为纯文字时走这个 (左栏三张卡)
+QFrame *makeCard(const QString &title, QWidget *child)
+{
+    QLabel *t = new QLabel(title);
+    t->setObjectName("CardTitle");
+    return makeCard(t, child);
 }
 
 } // namespace
@@ -96,10 +109,11 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setWindowTitle(QString::fromUtf8("种子查找器 v3.0"));
     // 左栏定宽 kLeftWidth, 右栏定宽 kRightWidth。
-    // 高度 448 = 原来的 430 + 进度条单独占的那一行 (16 + 2px 间距)。
-    // 其余靠压行高 (16)、表头 (20)、卡片标题与按钮内边距塞进去, 不出滚动条。
-    resize(kLeftWidth + kRightWidth + 32, 448);
-    setMinimumSize(kLeftWidth + kRightWidth + 24, 448);
+    // 高度 464 = 字号 11px 后实测所需: 条件表行高提到 18 (否则文字被切),
+    // 两张条件表各高 4px, 再加上进度条那一行 16px。
+    // 高度以实测的 hint 为准, 不能用估算 —— 差 1px 就会出滚动条。
+    resize(kLeftWidth + kRightWidth + 32, 464);
+    setMinimumSize(kLeftWidth + kRightWidth + 24, 464);
     buildUi();
 
     // 启动时不预置任何出怪条件: 用户自己从"添加"开始加,
@@ -542,15 +556,13 @@ QWidget *MainWindow::buildGlobalCard()
 
 QWidget *MainWindow::buildResultCard()
 {
-    QFrame *card = new QFrame;
-    card->setObjectName("Card");
-    QVBoxLayout *lay = new QVBoxLayout(card);
-    lay->setContentsMargins(14, 12, 14, 12);
-    lay->setSpacing(8);
-
     // 标题、种子输入框、"查看出怪" 放在同一行: 纵向上省下一整行,
-    // 右栏能多显示一行结果 (主界面高度锁在 430)。
-    QHBoxLayout *top = new QHBoxLayout;
+    // 右栏能多显示一行结果。
+    // 标题行是自定义控件, 所以走 makeCard(titleRow, child) 那个重载,
+    // 边距/间距与左栏三张卡完全一样。
+    QWidget *topRow = new QWidget;
+    QHBoxLayout *top = new QHBoxLayout(topRow);
+    top->setContentsMargins(0, 0, 0, 0);
     top->setSpacing(8);
     QLabel *title = new QLabel(QString::fromUtf8("查找结果"));
     title->setObjectName("CardTitle");
@@ -572,7 +584,6 @@ QWidget *MainWindow::buildResultCard()
     lookup->setObjectName("Ghost");
     connect(lookup, &QPushButton::clicked, this, &MainWindow::onLookupSeed);
     top->addWidget(lookup);
-    lay->addLayout(top);
 
     m_resultTable = new QTableWidget;
     m_resultTable->setColumnCount(2);
@@ -602,9 +613,7 @@ QWidget *MainWindow::buildResultCard()
     });
 
     // 详情不再占主界面: 双击结果行 (或点"查看出怪") 时弹独立窗口
-    lay->addWidget(m_resultTable, 1);
-
-    return card;
+    return makeCard(topRow, m_resultTable);
 }
 
 // ---------------------------------------------------------------------------
