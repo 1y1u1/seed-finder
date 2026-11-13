@@ -88,6 +88,17 @@ static thread_local RowRng t_rng;
 const int kLanes = 16;       // 每批 lane 数 (实测 16 与 32 只差 1%)
 const int kLaneHead = 132;   // 保留的 MT 前缀词数 (实测最多只用到 79 个)
 
+// 去重批大小。一行 (种子 s, 第 lv 轮) 的选卡表只取决于
+//   R = s + offset + 101*lv  (mod 2^32)
+// 所以 (s, lv) 与 (s+101, lv-1) 是同一张表: 连续 N 个种子 × W 轮只需要
+// N + 101*(W-1) 条 MT 链, 而不是 N*W 条 —— 全量 42.9 亿种子查 25 轮时,
+// 链数从 1072 亿降到 42.9 亿。块越大, 101 的"边界代价"摊得越薄。
+const int kBlock = 2048;
+// 去重表的内存上限 (张, 每张 40 字节)。表数 = 101*(轮跨度-1) + 块大小,
+// 65536 张约 2.6 MB, 覆盖到 630 多轮; 再宽就退回"按轮各算各的",
+// 免得为了省算力反而把表扫出缓存。
+const int kMaxTables = 65536;
+
 #if defined(SF_SIMD_X86)
 // SSE4.1 有 _mm_mullo_epi32 (一次算 4 个 32 位整数乘法)。x64 的编译基线只有 SSE2,
 // 所以运行时探测一次, 老机器退回标量实现。
@@ -267,6 +278,47 @@ struct LaneBatch
     }
 #endif
 
+    // 单条 lane 的完整选卡表 (d1[1..9] 就是各轮的累计上场表)
+    // 返回 false = 抽卡数超出保留前缀, 调用方需要退回串行补算
+    bool oneRow(quint32 allow, int l, quint32 d1[10]) const
+    {
+        quint32 t = tail[l];
+        int k = 0;
+        quint32 has = 1u;
+        d1[0] = 1u;
+        {
+            const quint32 tmp = (head[0][l] & 0x80000000u) | (head[1][l] & 0x7FFFFFFFu);
+            const quint32 v = ((tmp >> 1) ^ t) ^ ((tmp & 1u) ? 0x9908B0DFu : 0u);
+            t = (t ^ (t >> 30)) * 0x6C078965u + quint32(k + 0x18E);
+            ++k;
+            if (mtTemper(v) % 5u == 0u) {
+                d1[0] |= (1u << Z_NEWS);
+                has |= (1u << Z_NEWS);
+            } else {
+                d1[0] |= (1u << Z_CONE);
+                has |= (1u << Z_CONE);
+            }
+        }
+        int j = 1;
+        while (j < 10) {
+            if (k + 1 >= kLaneHead) return false;
+            const quint32 tmp = (head[k][l] & 0x80000000u) | (head[k + 1][l] & 0x7FFFFFFFu);
+            const quint32 v = ((tmp >> 1) ^ t) ^ ((tmp & 1u) ? 0x9908B0DFu : 0u);
+            t = (t ^ (t >> 30)) * 0x6C078965u + quint32(k + 0x18E);
+            ++k;
+            const int nid = kConvId[mtTemper(v) % 33u];
+            if (has & (1u << nid)) continue;
+            if (allow & (1u << nid)) {
+                has |= (1u << nid);
+                d1[j] = d1[j - 1];
+                if (nid != 24 && nid != 25) d1[j] |= (1u << nid);
+                ++j;
+            }
+        }
+        finishRow(d1);
+        return true;
+    }
+
     // 计算同一轮 level 上 count 条 lane 的上场表; false = 前缀不够, 需要串行补算
     bool rows(int scene, int level, int count, quint32 out[K]) const
     {
@@ -276,46 +328,34 @@ struct LaneBatch
         }
         const quint32 allow = quint32(sceneAllowMask(scene));
         for (int l = 0; l < count; ++l) {
-            quint32 t = tail[l];
-            int k = 0;
             quint32 d1[10];
-            quint32 has = 1u;
-            d1[0] = 1u;
-            {
-                const quint32 tmp = (head[0][l] & 0x80000000u) | (head[1][l] & 0x7FFFFFFFu);
-                const quint32 v = ((tmp >> 1) ^ t) ^ ((tmp & 1u) ? 0x9908B0DFu : 0u);
-                t = (t ^ (t >> 30)) * 0x6C078965u + quint32(k + 0x18E);
-                ++k;
-                if (mtTemper(v) % 5u == 0u) {
-                    d1[0] |= (1u << Z_NEWS);
-                    has |= (1u << Z_NEWS);
-                } else {
-                    d1[0] |= (1u << Z_CONE);
-                    has |= (1u << Z_CONE);
-                }
-            }
-            int j = 1;
-            while (j < 10) {
-                if (k + 1 >= kLaneHead) return false;
-                const quint32 tmp = (head[k][l] & 0x80000000u) | (head[k + 1][l] & 0x7FFFFFFFu);
-                const quint32 v = ((tmp >> 1) ^ t) ^ ((tmp & 1u) ? 0x9908B0DFu : 0u);
-                t = (t ^ (t >> 30)) * 0x6C078965u + quint32(k + 0x18E);
-                ++k;
-                const int nid = kConvId[mtTemper(v) % 33u];
-                if (has & (1u << nid)) continue;
-                if (allow & (1u << nid)) {
-                    has |= (1u << nid);
-                    d1[j] = d1[j - 1];
-                    if (nid != 24 && nid != 25) d1[j] |= (1u << nid);
-                    ++j;
-                }
-            }
-            finishRow(d1);
+            if (!oneRow(allow, l, d1)) return false;
             out[l] = (level >= 8) ? d1[9] : d1[level + 1];
         }
         return true;
     }
+
+    // 计算 count 条 lane 的完整选卡表。按 rngSeed 去重时, 一张表要服务
+    // 好几个 (种子, 轮), 所以这里把 d1 整张交出去, 不再只取其中一轮。
+    bool tables(int scene, int count, quint32 (*out)[10]) const
+    {
+        const quint32 allow = quint32(sceneAllowMask(scene));
+        for (int l = 0; l < count; ++l) {
+            if (!oneRow(allow, l, out[l])) return false;
+        }
+        return true;
+    }
 };
+
+// 串行补算: 直接给 rngSeed 算完整选卡表
+bool rowTableBySeed(quint32 rngSeed, int scene, quint32 d1[10])
+{
+    RowRng r;
+    r.rngInit(rngSeed ? rngSeed : 0x1105u);
+    SerialDraw draw;
+    draw.rng = &r;
+    return buildRow(scene, draw, d1);
+}
 
 // 串行补算: 直接给 rngSeed 算该轮上场表
 bool rowBitsBySeed(quint32 rngSeed, int scene, int level, quint32 &out)
@@ -324,12 +364,8 @@ bool rowBitsBySeed(quint32 rngSeed, int scene, int level, quint32 &out)
         out = 11u;
         return true;
     }
-    RowRng r;
-    r.rngInit(rngSeed ? rngSeed : 0x1105u);
-    SerialDraw draw;
-    draw.rng = &r;
     quint32 d1[10];
-    if (!buildRow(scene, draw, d1)) return false;
+    if (!rowTableBySeed(rngSeed, scene, d1)) return false;
     out = (level >= 8) ? d1[9] : d1[level + 1];
     return true;
 }
@@ -879,12 +915,63 @@ SearchResult Searcher::run(const SearchSpec &spec,
             ResultCollector &col = cols[size_t(t)];
             std::atomic<quint64> &myHitsSlot = hits[size_t(t)];
 
+            // ---- 这一批真正要算的轮 (循环不变量) ----------------------------
+            // lv <= 0 的轮 (F 1~2) 位恒为 11u, 查表没意义, 单独一次算掉;
+            // 其余按 lv 升序登记, 用 R 差值当表内偏移。
+            std::vector<int> statIdx;            // lv <= 0 的轮在 level 数组里的下标
+            std::vector<int> advLv, advIdx, advStride;
+            advLv.reserve(size_t(nLevels));
+            advIdx.reserve(size_t(nLevels));
+            for (int i = 0; i < nLevels; ++i) {
+                if (!needLevel[size_t(i)]) continue;
+                const int lv = levelBegin + i;
+                if (lv <= 0) { statIdx.push_back(i); continue; }
+                advLv.push_back(lv);
+                advIdx.push_back(i);
+            }
+            const int aStatic = int(statIdx.size());
+            const int aCount = int(advLv.size());
+            const int lvFirst = aCount > 0 ? advLv[0] : 0;
+            for (int k = 0; k < aCount; ++k) advStride.push_back(101 * (advLv[size_t(k)] - lvFirst));
+            // 表缓存要存的张数是 "101*(轮跨度-1) + 块大小"。跨度太大 (比如区间划到
+            // 几千 F, 只查头尾两轮) 时这些表根本换不回收益, 就退回"逐轮各算各的"。
+            const int lastStride = aCount > 0 ? advStride[size_t(aCount - 1)] : 0;
+            const bool dedup = (lastStride + kLanes <= kMaxTables);
+            const int blockCap = dedup ? kBlock : kLanes;
+
+            // 每轮的条件指针/条数也一次取好, 免得内层反复算偏移
+            std::vector<const WaveCondition *> advRank(size_t(aCount), nullptr);
+            std::vector<const WaveCondition *> advHard(size_t(aCount), nullptr);
+            std::vector<int> advRankN(size_t(aCount), 0), advHardN(size_t(aCount), 0);
+            for (int k = 0; k < aCount; ++k) {
+                const size_t i = size_t(advIdx[size_t(k)]);
+                advRankN[size_t(k)] = rankCnt[i];
+                advHardN[size_t(k)] = hardCnt[i];
+                if (rankCnt[i] > 0) advRank[size_t(k)] = &rankFlat[size_t(rankOff[i])];
+                if (hardCnt[i] > 0) advHard[size_t(k)] = &hardFlat[size_t(hardOff[i])];
+            }
+            std::vector<const WaveCondition *> statRank(size_t(aStatic), nullptr);
+            std::vector<const WaveCondition *> statHard(size_t(aStatic), nullptr);
+            std::vector<int> statRankN(size_t(aStatic), 0), statHardN(size_t(aStatic), 0);
+            for (int k = 0; k < aStatic; ++k) {
+                const size_t i = size_t(statIdx[size_t(k)]);
+                statRankN[size_t(k)] = rankCnt[i];
+                statHardN[size_t(k)] = hardCnt[i];
+                if (rankCnt[i] > 0) statRank[size_t(k)] = &rankFlat[size_t(rankOff[i])];
+                if (hardCnt[i] > 0) statHard[size_t(k)] = &hardFlat[size_t(hardOff[i])];
+            }
+
             LaneBatch<kLanes> batch;
             quint32 rs[kLanes];
-            quint32 out[kLanes];
-            int laneSeedIdx[kLanes];     // 组内 lane → 本 chunk 内的种子下标
-            bool alive[kLanes];
-            int matched[kLanes];
+            quint32 tabRows[kLanes][10];
+            std::vector<quint32> tab;                 // 一整块的选卡表, 每张 10 个词
+            size_t cachedTables = 0;                  // tab 里目前有效的表数
+            int prevBlock = 0;                        // 上一块实际处理了几个种子
+            std::vector<quint8> alive(size_t(kBlock), 0);
+            std::vector<int> matched(size_t(kBlock), 0);
+            if (aCount > 0) {
+                tab.reserve(size_t(advStride[size_t(aCount - 1)] + blockCap) * 10);
+            }
 
             quint64 done = 0;
             quint64 reported = 0;        // 已上报到 scanned 的数量
@@ -904,88 +991,124 @@ SearchResult Searcher::run(const SearchSpec &spec,
                 }
                 if (goalHit.load(std::memory_order_relaxed)) break;
 
-                const int chunk = int(std::min<quint64>(myCount - done, quint64(kLanes)));
+                // 参与排序的种子数与本块起点
+                const int block = int(std::min<quint64>(myCount - done, quint64(blockCap)));
                 const quint64 seedBase = myBegin + done;
-                for (int l = 0; l < chunk; ++l) {
-                    alive[l] = true;
-                    matched[l] = 0;
+
+                for (int l = 0; l < block; ++l) {
+                    alive[size_t(l)] = 1;
+                    matched[size_t(l)] = 0;
                 }
-                int aliveCount = chunk;
+                int aliveCount = block;
 
-                for (int i = 0; i < nLevels && aliveCount > 0; ++i) {
-                    if (!needLevel[size_t(i)]) continue;
-                    const int lv = levelBegin + i;
-
-                    // 把还活着的种子压到前面, 保证每次 init 的 lane 都是满的
-                    int cnt = 0;
-                    for (int l = 0; l < chunk; ++l) {
-                        if (!alive[l]) continue;
-                        laneSeedIdx[cnt] = l;
-                        const quint64 s = quint64(quint32(seedBase + quint64(l)));
-                        rs[cnt] = quint32(s + quint64(off32) + quint64(101u) * quint64(lv));
-                        ++cnt;
+                // ---- 一次算出一整块的选卡表, 按 R 去重 --------------------
+                // 表里的第 j 张对应 R = (seedBase + off32 + 101*lvFirst) + j。
+                // 上一块已经算过 [block, 旧表长) 这一段 (就是 101*(lvSpan-1) 个
+                // 跨块的 R), 搬过来接着用, 只补算新露出来的 block 张。
+                if (aCount > 0 && dedup) {
+                    const int need = advStride[size_t(aCount - 1)] + block;   // 本块要用的表数
+                    // 位移量是"上一块"的大小, 不是本块 —— 只有最后一块会比 kBlock 小,
+                    // 用本块大小去搬就会错位。
+                    int keep = int(cachedTables) - prevBlock;
+                    if (keep < 0) keep = 0;
+                    if (keep > need) keep = need;
+                    if (keep > 0) {
+                        std::memmove(tab.data(), tab.data() + size_t(prevBlock) * 10,
+                                     size_t(keep) * 10 * sizeof(quint32));
                     }
+                    tab.resize(size_t(need) * 10);
+                    cachedTables = size_t(need);
 
-                    batch.init(rs, cnt);
-                    if (!batch.rows(scene, lv, cnt, out)) {
-                        // 抽卡数超出保留前缀 (实测未发生), 退回串行
-                        for (int l = 0; l < cnt; ++l)
-                            rowBitsBySeed(rs[l], scene, lv, out[l]);
-                    }
-
-                    const WaveCondition *rankC = rankCnt[size_t(i)] > 0
-                                                     ? &rankFlat[size_t(rankOff[size_t(i)])]
-                                                     : nullptr;
-                    const int rankN = rankCnt[size_t(i)];
-                    const WaveCondition *hardC = hardCnt[size_t(i)] > 0
-                                                     ? &hardFlat[size_t(hardOff[size_t(i)])]
-                                                     : nullptr;
-                    const int hardN = hardCnt[size_t(i)];
-                    // 绝大多数轮只被一条规则带覆盖 (或干脆只有排名条件/只有硬性条件),
-                    // 这些常见组合单独写一条循环, 免掉每条 lane 上的条数判断
-                    if (rankN == 1 && hardN == 1) {
-                        const WaveCondition &rc0 = rankC[0];
-                        const WaveCondition &hc0 = hardC[0];
-                        for (int l = 0; l < cnt; ++l) {
-                            const int li = laneSeedIdx[l];
-                            const quint32 bits = out[l];
-                            if (rc0.matches(bits)) ++matched[li];
-                            if (!hc0.matches(bits)) {
-                                alive[li] = false;
-                                --aliveCount;
+                    for (int base = keep; base < need; base += kLanes) {
+                        const int n = std::min(kLanes, need - base);
+                        for (int l = 0; l < n; ++l) {
+                            const quint64 s = quint64(quint32(seedBase + quint64(base + l)));
+                            rs[l] = quint32(s + quint64(off32) + quint64(101u) * quint64(lvFirst));
+                        }
+                        batch.init(rs, n);
+                        if (batch.tables(scene, n, tabRows)) {
+                            for (int l = 0; l < n; ++l) {
+                                for (int j = 0; j < 10; ++j) tab[size_t(base + l) * 10 + j] = tabRows[l][j];
+                            }
+                        } else {
+                            for (int l = 0; l < n; ++l) {
+                                quint32 t[10];
+                                if (!rowTableBySeed(rs[l], scene, t))
+                                    for (int j = 0; j < 10; ++j) t[j] = 1u;
+                                for (int j = 0; j < 10; ++j) tab[size_t(base + l) * 10 + j] = t[j];
                             }
                         }
-                    } else if (rankN == 1 && hardN == 0) {
-                        const WaveCondition &rc0 = rankC[0];
-                        for (int l = 0; l < cnt; ++l) {
-                            if (rc0.matches(out[l])) ++matched[laneSeedIdx[l]];
+                    }
+                }
+
+                // lv <= 0 的轮 (F 1~2): 位恒为 11u, 与种子无关, 每轮判一次就够
+                for (int k = 0; k < aStatic && aliveCount > 0; ++k) {
+                    const WaveCondition *rankC = statRank[size_t(k)];
+                    const WaveCondition *hardC = statHard[size_t(k)];
+                    if (rankC) {
+                        bool ok = true;
+                        for (int c = 0; c < statRankN[size_t(k)] && ok; ++c) {
+                            if (!rankC[c].matches(11u)) ok = false;
                         }
-                    } else if (rankN == 0 && hardN == 1) {
-                        const WaveCondition &hc0 = hardC[0];
-                        for (int l = 0; l < cnt; ++l) {
-                            if (!hc0.matches(out[l])) {
-                                alive[laneSeedIdx[l]] = false;
-                                --aliveCount;
+                        if (ok) {
+                            for (int l = 0; l < block; ++l) ++matched[size_t(l)];
+                        }
+                    }
+                    if (hardC) {
+                        bool ok = true;
+                        for (int c = 0; c < statHardN[size_t(k)] && ok; ++c) {
+                            if (!hardC[c].matches(11u)) ok = false;
+                        }
+                        if (!ok) aliveCount = 0;
+                    }
+                }
+
+                // 轮跨度太大时不做表缓存: 每条 lane 每轮单独算 (块已缩到 kLanes)
+                if (aCount > 0 && !dedup) {
+                    quint32 outs[kLanes];
+                    int idxs[kLanes];
+                    for (int k = 0; k < aCount && aliveCount > 0; ++k) {
+                        const int lv = advLv[size_t(k)];
+                        const WaveCondition *rankC = advRank[size_t(k)];
+                        const int rankN = advRankN[size_t(k)];
+                        const WaveCondition *hardC = advHard[size_t(k)];
+                        const int hardN = advHardN[size_t(k)];
+
+                        int cnt = 0;
+                        for (int l = 0; l < block; ++l) {
+                            if (!alive[size_t(l)]) continue;
+                            idxs[cnt] = l;
+                            const quint64 s = quint64(quint32(seedBase + quint64(l)));
+                            rs[cnt] = quint32(s + quint64(off32) + quint64(101u) * quint64(lv));
+                            ++cnt;
+                        }
+                        if (cnt == 0) break;
+                        batch.init(rs, cnt);
+                        if (!batch.rows(scene, lv, cnt, outs)) {
+                            for (int i = 0; i < cnt; ++i) {
+                                quint32 t[10];
+                                if (!rowTableBySeed(rs[i], scene, t))
+                                    for (int j = 0; j < 10; ++j) t[j] = 1u;
+                                outs[i] = (lv >= 8) ? t[9] : t[lv + 1];
                             }
                         }
-                    } else {
-                        for (int l = 0; l < cnt; ++l) {
-                            const int li = laneSeedIdx[l];
-                            const quint32 bits = out[l];
+                        for (int i = 0; i < cnt; ++i) {
+                            const int l = idxs[i];
+                            const quint32 bits = outs[i];
                             if (rankC) {
                                 bool ok = true;
-                                for (int k = 0; k < rankN && ok; ++k) {
-                                    if (!rankC[k].matches(bits)) ok = false;
+                                for (int c = 0; c < rankN && ok; ++c) {
+                                    if (!rankC[c].matches(bits)) ok = false;
                                 }
-                                if (ok) ++matched[li];
+                                if (ok) ++matched[size_t(l)];
                             }
                             if (hardC) {
                                 bool ok = true;
-                                for (int k = 0; k < hardN && ok; ++k) {
-                                    if (!hardC[k].matches(bits)) ok = false;
+                                for (int c = 0; c < hardN && ok; ++c) {
+                                    if (!hardC[c].matches(bits)) ok = false;
                                 }
-                                if (!ok) {          // 硬性要求不满足, 这个种子出局
-                                    alive[li] = false;
+                                if (!ok) {
+                                    alive[size_t(l)] = 0;
                                     --aliveCount;
                                 }
                             }
@@ -993,14 +1116,47 @@ SearchResult Searcher::run(const SearchSpec &spec,
                     }
                 }
 
+                for (int k = 0; k < aCount && dedup && aliveCount > 0; ++k) {
+                    const int lv = advLv[size_t(k)];
+                    const int stride = advStride[size_t(k)];
+                    const WaveCondition *rankC = advRank[size_t(k)];
+                    const int rankN = advRankN[size_t(k)];
+                    const WaveCondition *hardC = advHard[size_t(k)];
+                    const int hardN = advHardN[size_t(k)];
+
+                    // 同一轮里各条 lane 的位就在 tab[stride + l] 上
+                    const int col = (lv >= 8) ? 9 : lv + 1;
+                    for (int l = 0; l < block; ++l) {
+                        if (!alive[size_t(l)]) continue;
+                        const quint32 bits = tab[size_t(stride + l) * 10 + col];
+                        if (rankC) {
+                            bool ok = true;
+                            for (int c = 0; c < rankN && ok; ++c) {
+                                if (!rankC[c].matches(bits)) ok = false;
+                            }
+                            if (ok) ++matched[size_t(l)];
+                        }
+                        if (hardC) {
+                            bool ok = true;
+                            for (int c = 0; c < hardN && ok; ++c) {
+                                if (!hardC[c].matches(bits)) ok = false;
+                            }
+                            if (!ok) {
+                                alive[size_t(l)] = 0;
+                                --aliveCount;
+                            }
+                        }
+                    }
+                }
+
                 // 逐个种子计数: 达到设定数量就停在那个种子上, 与串行版行为一致
-                int consumed = chunk;
-                for (int l = 0; l < chunk; ++l) {
-                    if (!alive[l]) continue;
-                    col.add(matched[l], quint32(seedBase + quint64(l)));
+                int consumed = block;
+                for (int l = 0; l < block; ++l) {
+                    if (!alive[size_t(l)]) continue;
+                    col.add(matched[size_t(l)], quint32(seedBase + quint64(l)));
                     ++myHits;
                     if (spec.autoStop > 0 &&
-                        (rankTable.empty() || matched[l] == res.activeWaves)) {
+                        (rankTable.empty() || matched[size_t(l)] == res.activeWaves)) {
                         if (globalFull.fetch_add(1, std::memory_order_relaxed) + 1 >= spec.autoStop) {
                             goalHit.store(true, std::memory_order_relaxed);
                             consumed = l + 1;   // 当前种子已计入, 也要算进已检查数
@@ -1009,6 +1165,7 @@ SearchResult Searcher::run(const SearchSpec &spec,
                     }
                 }
                 myHitsSlot.store(myHits, std::memory_order_relaxed);
+                prevBlock = block;
 
                 done += quint64(consumed);
                 if (done - reported >= 4096) {
