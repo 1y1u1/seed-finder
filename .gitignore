@@ -37,14 +37,12 @@ debug/
 
 # ---- 不进主线的目录 ----
 # _bench: 本地基准与回归工具, 只在本机用, 不上传
-# zombie_calculator-master: 第三方参考项目, 不上传
-# seed-finder-qt-main1.2: 1.2 / 2.0 版旧源码, 只在 legacy-2.0 分支上保留
+# _tmp: 临时探针、截图、测试输出
 /_bench/
-/zombie_calculator-master/
-/seed-finder-qt-main1.2/
+/_tmp/
 /_ssh/
 
-# GPU 后端的源码在 gpu 分支入库; main 分支上这个目录根本不存在。
+# CUDA 后端的源码 (_gpu/*.cu / *.cpp / *.h / README) 已入库,
 # 只忽略构建产物 (nvcc/qmake 的 obj、release/、日志、Makefile)。
 # 用 _gpu/* 而不是 /_gpu/ —— 整个目录忽略掉的话 add -f 也要一个一个来。
 /_gpu/Makefile*
