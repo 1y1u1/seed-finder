@@ -36,7 +36,7 @@ HEADERS += \
     searchworker.h \
     mainwindow.h
 
-RC_ICONS = ../seed-finder-qt-main1.2/icon.ico
+RC_ICONS = res/icon.ico
 
 RESOURCES += res.qrc
 
