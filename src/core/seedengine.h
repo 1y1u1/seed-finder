@@ -151,6 +151,9 @@ QString checkBand(const RuleBand &b, int scene, const QString &kind,
 // 全部 25 轮复用, 与游戏 / 原版 worker.cpp 逐位一致。
 void computeRow(quint32 pos, int scene, quint32 d1[10]);
 
+// 直接按 rngSeed 生成完整选卡表。GPU 对拍程序也用它当黄金标准。
+bool rowTableBySeed(quint32 rngSeed, int scene, quint32 d1[10]);
+
 // 从选卡表取第 level 轮的出怪位掩码 (level 0 固定 11, >=8 夹到 8)
 inline quint32 rowBits(const quint32 d1[10], int level)
 {
@@ -255,6 +258,7 @@ struct SearchSpec
     int outputSize = 20;            // 每种匹配轮数最多保留多少个示例种子
     int threads = 0;                // 0 = 自动
     quint64 autoStop = 0;           // 非 0: 找满这么多个"全部满足"的种子就提前停
+    int gpu = 1;                    // 0 = 只用 CPU; 默认优先 GPU, 设备/初始化不可用时自动退回 CPU
 
     // 出怪条件: 只用于排名 (满足的轮数越多越靠前)
     QVector<RuleBand> bands;

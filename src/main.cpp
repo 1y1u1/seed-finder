@@ -1,6 +1,7 @@
 #include "banddialog.h"
 #include "conddialog.h"
 #include "detaildialog.h"
+#include "gpuhook.h"
 #include "helppages.h"
 #include "mainwindow.h"
 #include "presetstore.h"
@@ -41,6 +42,16 @@ int main(int argc, char *argv[])
 
     // 命令行辅助: --selftest 只跑引擎交叉校验; --shot <png> 截图后退出
     const QStringList args = a.arguments();
+
+    // GPU 后端: 有可用设备且编进了 CUDA 实现时才注册, 否则保持 nullptr ——
+    // 引擎会自动走 CPU 路径, 行为与没有 GPU 时完全一致。
+    // --nogpu 强制只用 CPU (排查问题 / 对比结果时用)。
+    static sf::GpuBackend *g_gpu = nullptr;
+    if (!args.contains(QStringLiteral("--nogpu"))) {
+        g_gpu = sf::createGpuBackend();
+        if (g_gpu) sf::setGpuBackend(g_gpu);
+    }
+
     if (args.contains(QStringLiteral("--selftest"))) {
         const QString err = sf::Searcher::selfCheck();
         std::printf("%s\n", err.isEmpty() ? "selfCheck: OK"

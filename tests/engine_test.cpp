@@ -90,12 +90,20 @@ int main(int argc, char **argv)
         bool same = (r1.buckets.size() == r8.buckets.size());
         if (same) {
             for (int i = 0; i < r1.buckets.size(); ++i) {
+                // 不用 QVector::operator== —— Qt 5.12 的实现在 MSVC 14.52 下会
+                // 实例化 stdext::make_checked_array_iterator, 那个 API 已被删除。
                 if (r1.buckets[i].matched != r8.buckets[i].matched
                     || r1.buckets[i].total != r8.buckets[i].total
-                    || r1.buckets[i].examples != r8.buckets[i].examples) {
+                    || r1.buckets[i].examples.size() != r8.buckets[i].examples.size()) {
                     same = false;
                     break;
                 }
+                const QVector<quint32> &e1 = r1.buckets[i].examples;
+                const QVector<quint32> &e8 = r8.buckets[i].examples;
+                for (int k = 0; k < e1.size(); ++k) {
+                    if (e1.at(k) != e8.at(k)) { same = false; break; }
+                }
+                if (!same) break;
             }
         }
         out << "determinism(1 vs N threads): " << (same ? "OK" : "MISMATCH") << endl;

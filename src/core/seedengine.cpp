@@ -1,5 +1,7 @@
 #include "seedengine.h"
 
+#include "gpuhook.h"    // GPU 后端抽象 (没接后端时 gpuBackend() 返回空, 自动走 CPU)
+
 #include <QElapsedTimer>
 #include <QStringList>
 
@@ -348,7 +350,7 @@ struct LaneBatch
 };
 
 // 串行补算: 直接给 rngSeed 算完整选卡表
-bool rowTableBySeed(quint32 rngSeed, int scene, quint32 d1[10])
+bool rowTableSerial(quint32 rngSeed, int scene, quint32 d1[10])
 {
     RowRng r;
     r.rngInit(rngSeed ? rngSeed : 0x1105u);
@@ -365,12 +367,17 @@ bool rowBitsBySeed(quint32 rngSeed, int scene, int level, quint32 &out)
         return true;
     }
     quint32 d1[10];
-    if (!rowTableBySeed(rngSeed, scene, d1)) return false;
+    if (!rowTableSerial(rngSeed, scene, d1)) return false;
     out = (level >= 8) ? d1[9] : d1[level + 1];
     return true;
 }
 
 } // namespace
+
+bool rowTableBySeed(quint32 rngSeed, int scene, quint32 d1[10])
+{
+    return rowTableSerial(rngSeed, scene, d1);
+}
 
 void computeRow(quint32 pos, int scene, quint32 d1[10])
 {
@@ -830,54 +837,14 @@ SearchResult Searcher::run(const SearchSpec &spec,
         return res;
     }
 
-    // 种子区间裁剪。
-    // 扫描的是"连续种子"空间 (与参考实现 zombie_calculator 一致)。
-    // 注意: 原版 worker.cpp 扫的是 r_val 空间 (cur 每步 +1), 相邻种子相差 101,
-    //       等于只检查了区间内 1/101 的种子; 本引擎按种子逐个连续检查。
-    quint64 span = spec.span;
-    if (span == 0) span = 1;
-
-    const quint64 begin = quint64(spec.seedBegin);
-    if (begin >= SEED_SPACE) {
-        res.error = QString::fromUtf8("起始种子超出范围");
-        return res;
-    }
-    if (span > SEED_SPACE - begin) span = SEED_SPACE - begin;
-
-    int threads = spec.threads > 0 ? spec.threads : int(std::thread::hardware_concurrency());
-    if (threads <= 0) threads = 1;
-    if (quint64(threads) > span) threads = int(span);
-    // 上限保护: threads 是从界面/命令行传进来的, 一旦被填成一个很大的数,
-    // 光是建线程和给每个线程分配 ResultCollector 就会把内存吃光。
-    // 实际并行度超过 64 已经没有收益(这里扫描量再大也是内存带宽受限)。
-    if (threads > 64) threads = 64;
-
-    std::vector<ResultCollector> cols;
-    cols.resize(static_cast<size_t>(threads));
-    for (int t = 0; t < threads; ++t) cols[size_t(t)].init(res.activeWaves, spec.outputSize);
-
-    std::atomic<quint64> scanned(0);
-    std::atomic<bool> cancelHit(false);
-    std::atomic<int> doneThreads(0);
-    // 达标提前停止: 各线程把自己的"全部满足"计数累加到这里,
-    // 任何一个线程发现总数达到 autoStop 就设置 goalHit, 全体停下
-    std::atomic<bool> goalHit(false);
-    std::atomic<quint64> globalFull(0);
-
-    // 每个线程处理连续的一段
-    const quint64 per = span / quint64(threads);
-    const quint64 rem = span % quint64(threads);
-
-    std::vector<std::thread> pool;
-    pool.reserve(size_t(threads));
-
+    // ---- 每轮的条件按轮连续展开 ---------------------------------------
+    // 同一轮可能被多条规则带覆盖 (条件取"与"), 所以存的是
+    // "按轮连续展开的条件数组 + 每轮在数组里的偏移和条数"。
+    // CPU 与 GPU 两条路径共用这份编译结果。
     const int levelBegin = res.waveBegin;
     const int levelEnd = res.waveEnd;
     const int nLevels = levelEnd - levelBegin;
 
-    // 每轮的两类条件 + 是否需要算这一轮。
-    // 同一轮可能被多条规则带覆盖 (条件取"与"), 所以这里存的是
-    // "按轮连续展开的条件数组 + 每轮在数组里的偏移和条数"。
     const size_t nSize = size_t(std::max(0, nLevels));
     std::vector<quint8> needLevel(nSize, 0);
     std::vector<int> rankOff(nSize, 0), rankCnt(nSize, 0);
@@ -902,11 +869,197 @@ SearchResult Searcher::run(const SearchSpec &spec,
     const quint32 off32 = quint32(spec.uid + spec.mode);
     const int scene = spec.scene;
 
-    // 进度用: 各线程把已命中数写到自己那一格, 轮询线程只读原子量,
-    // 避免读到工作线程正在改写的 ResultCollector (数据竞争)
-    std::unique_ptr<std::atomic<quint64>[]> hits(
-        new std::atomic<quint64>[size_t(std::max(1, threads))]);
-    for (int t = 0; t < threads; ++t) hits[size_t(t)].store(0, std::memory_order_relaxed);
+    // CPU 与 GPU 两条路径共用的计数器 (GPU 快路径也要用, 所以写在分叉之前)
+    std::atomic<quint64> scanned(0);
+    std::atomic<bool> cancelHit(false);
+    // 达标提前停止: 任一执行单元发现"全部满足"的总数达到 autoStop 就置位, 全体停下
+    std::atomic<bool> goalHit(false);
+    std::atomic<quint64> globalFull(0);
+    // 进度用: GPU 路径只用 hits[0]; CPU 路径每个线程写自己那一格。
+    // 轮询线程只读原子量, 不去碰工作线程正在改写的 ResultCollector (数据竞争)。
+    std::unique_ptr<std::atomic<quint64>[]> hits(new std::atomic<quint64>[64]);
+    for (int t = 0; t < 64; ++t) hits[size_t(t)].store(0, std::memory_order_relaxed);
+
+    // 种子区间裁剪。
+    // 扫描的是"连续种子"空间 (与参考实现 zombie_calculator 一致)。
+    // 注意: 原版 worker.cpp 扫的是 r_val 空间 (cur 每步 +1), 相邻种子相差 101,
+    //       等于只检查了区间内 1/101 的种子; 本引擎按种子逐个连续检查。
+    quint64 span = spec.span;
+    if (span == 0) span = 1;
+
+    const quint64 begin = quint64(spec.seedBegin);
+    if (begin >= SEED_SPACE) {
+        res.error = QString::fromUtf8("起始种子超出范围");
+        return res;
+    }
+    if (span > SEED_SPACE - begin) span = SEED_SPACE - begin;
+
+    // ---- GPU 快路径 ---------------------------------------------------
+    // 去重后的选卡表只有 "种子数 + 101*(跨度-1)" 张, 显存完全放得下, 所以
+    // 一次扫一大块。分块只是为了控制显存占用, 并让"暂停 / 停止 / 找够了提前停"
+    // 能及时生效 (粒度是一块)。
+    GpuBackend *gpu = (spec.gpu == 0) ? nullptr : gpuBackend();
+    // 小规模检索交给 CPU: GPU 每块都要建表 + 回传, 首次还要初始化 CUDA 上下文
+    // (几十毫秒), 扫几千个种子时反而比 CPU 慢一个数量级。
+    // 经验值: 2e5 个种子以下 CPU 更快, 以上 GPU 明显占优。
+    if (gpu && nLevels > 0 && span >= 200000) {
+        std::vector<GpuLevelDesc> glevels;
+        std::vector<GpuCond> gconds;
+        int lvFirst = 0;
+        for (int i = 0; i < nLevels && lvFirst == 0; ++i) {
+            if (!needLevel[size_t(i)]) continue;
+            const int lv = levelBegin + i;
+            if (lv > 0) lvFirst = lv;
+        }
+        // 只有 F 1~2 的条件时没有选卡表可算, 交给 CPU 更快。
+        if (lvFirst > 0) {
+            for (int i = 0; i < nLevels; ++i) {
+                if (!needLevel[size_t(i)]) continue;
+                const int lv = levelBegin + i;
+                GpuLevelDesc g;
+                g.level = lv;
+                g.tableStride = (lv > 0) ? unsigned(101 * (lv - lvFirst)) : 0u;
+                if (rankCnt[size_t(i)] > 0) {
+                    g.rankOff = unsigned(gconds.size());
+                    g.rankCnt = unsigned(rankCnt[size_t(i)]);
+                    for (int c = 0; c < rankCnt[size_t(i)]; ++c) {
+                        const WaveCondition &w = rankFlat[size_t(rankOff[size_t(i)] + c)];
+                        GpuCond gc;
+                        gc.needMask = w.needMask;
+                        gc.needTotal = unsigned(w.needTotal);
+                        gc.refuseMask = w.refuseMask;
+                        gc.atLeastMask = w.atLeastMask;
+                        gc.atLeast = unsigned(w.atLeast);
+                        gc.atMostMask = w.atMostMask;
+                        gc.atMost = unsigned(w.atMost);
+                        gconds.push_back(gc);
+                    }
+                }
+                if (hardCnt[size_t(i)] > 0) {
+                    g.hardOff = unsigned(gconds.size());
+                    g.hardCnt = unsigned(hardCnt[size_t(i)]);
+                    for (int c = 0; c < hardCnt[size_t(i)]; ++c) {
+                        const WaveCondition &w = hardFlat[size_t(hardOff[size_t(i)] + c)];
+                        GpuCond gc;
+                        gc.needMask = w.needMask;
+                        gc.needTotal = unsigned(w.needTotal);
+                        gc.refuseMask = w.refuseMask;
+                        gc.atLeastMask = w.atLeastMask;
+                        gc.atLeast = unsigned(w.atLeast);
+                        gc.atMostMask = w.atMostMask;
+                        gc.atMost = unsigned(w.atMost);
+                        gconds.push_back(gc);
+                    }
+                }
+                glevels.push_back(g);
+            }
+
+            std::string gpuErr;
+            if (glevels.empty() || glevels.back().level <= 0 ||
+                !gpu->prepare(glevels, gconds, quint32(sceneAllowMask(scene)), off32, lvFirst, &gpuErr)) {
+                // 准备失败就当没有 GPU, 继续走 CPU
+            } else {
+                // 分块从 64K 起步, 成功一块就翻 4 倍, 封顶 4M 个种子。
+                // 小步起步的原因: 很多查询扫不到十万个种子就"找够了"提前停止,
+                // 这时固定 4M 的话, 光是建 128 MB 选卡表就白花好几毫秒。
+                // 大步收尾则是为了避免大范围扫描时被 launch 开销拖慢。
+                const quint64 kChunkMax = quint64(1) << 22;
+                quint64 chunk = quint64(1) << 16;
+                ResultCollector gcol;
+                gcol.init(res.activeWaves, spec.outputSize);
+                quint64 gDone = 0;
+                bool gOk = true;
+
+                while (gDone < span) {
+                    while (pause && pause->load(std::memory_order_relaxed)
+                           && !(cancel && cancel->load(std::memory_order_relaxed))
+                           && !goalHit.load(std::memory_order_relaxed)) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                    }
+                    if (cancel && cancel->load(std::memory_order_relaxed)) {
+                        cancelHit.store(true, std::memory_order_relaxed);
+                        break;
+                    }
+                    if (goalHit.load(std::memory_order_relaxed)) break;
+
+                    const quint64 n = std::min<quint64>(span - gDone, chunk);
+                    std::vector<unsigned short> outv;
+                    if (!gpu->scan(unsigned(begin + gDone), unsigned(n), outv, &gpuErr) ||
+                        outv.size() != size_t(n)) {
+                        gOk = false;        // 中途失败: 丢掉已算的部分, 整个改用 CPU 重扫
+                        break;
+                    }
+
+                    for (quint64 l = 0; l < n; ++l) {
+                        const unsigned short m = outv[size_t(l)];
+                        if (m == 0) continue;          // 被硬性条件刷掉
+                        const int mt = int(m) - 1;
+                        gcol.add(mt, quint32(begin + gDone + l));
+                        if (spec.autoStop > 0 &&
+                            (rankTable.empty() || mt == res.activeWaves)) {
+                            if (globalFull.fetch_add(1, std::memory_order_relaxed) + 1 >= spec.autoStop) {
+                                goalHit.store(true, std::memory_order_relaxed);
+                                gDone += l + 1;        // 当前种子已计入, 也算进已检查数
+                                break;
+                            }
+                        }
+                    }
+                    if (goalHit.load(std::memory_order_relaxed)) break;
+                    gDone += n;
+                    if (chunk < kChunkMax) {
+                        chunk *= 4;
+                        if (chunk > kChunkMax) chunk = kChunkMax;
+                    }
+
+                    scanned.store(gDone, std::memory_order_relaxed);
+                    if (onProgress) {
+                        const int pct = int((std::min(gDone, span) * 100) / span);
+                        const quint64 q = gcol.qualified(0);
+                        hits[0].store(q, std::memory_order_relaxed);
+                        onProgress(pct, gDone, q);
+                    }
+                }
+
+                if (gOk) {
+                    res.buckets = gcol.take();
+                    res.scanned = gDone;
+                    if (res.scanned > span) res.scanned = span;
+                    res.qualified = gcol.qualified(0);
+                    res.stopped = cancelHit.load(std::memory_order_relaxed);
+                    res.enoughFound = goalHit.load(std::memory_order_relaxed);
+                    res.seconds = double(timer.elapsed()) / 1000.0;
+                    if (onProgress) onProgress(100, res.scanned, res.qualified);
+                    return res;
+                }
+                // GPU 失败: 清场后落到 CPU 路径从头重扫
+                goalHit.store(false, std::memory_order_relaxed);
+                globalFull.store(0, std::memory_order_relaxed);
+                scanned.store(0, std::memory_order_relaxed);
+                cancelHit.store(false, std::memory_order_relaxed);
+            }
+        }
+    }
+
+    int threads = spec.threads > 0 ? spec.threads : int(std::thread::hardware_concurrency());
+    if (threads <= 0) threads = 1;
+    if (quint64(threads) > span) threads = int(span);
+    // 上限保护: threads 是从界面/命令行传进来的, 一旦被填成一个很大的数,
+    // 光是建线程和给每个线程分配 ResultCollector 就会把内存吃光。
+    // 实际并行度超过 64 已经没有收益(这里扫描量再大也是内存带宽受限)。
+    if (threads > 64) threads = 64;
+
+    std::vector<ResultCollector> cols;
+    cols.resize(static_cast<size_t>(threads));
+    for (int t = 0; t < threads; ++t) cols[size_t(t)].init(res.activeWaves, spec.outputSize);
+
+    std::atomic<int> doneThreads(0);
+
+    // 每个线程处理连续的一段
+    const quint64 per = span / quint64(threads);
+    const quint64 rem = span % quint64(threads);
+
+    std::vector<std::thread> pool;
+    pool.reserve(size_t(threads));
 
     for (int t = 0; t < threads; ++t) {
         const quint64 myCount = per + (quint64(t) < rem ? 1 : 0);
@@ -1033,7 +1186,7 @@ SearchResult Searcher::run(const SearchSpec &spec,
                         } else {
                             for (int l = 0; l < n; ++l) {
                                 quint32 t[10];
-                                if (!rowTableBySeed(rs[l], scene, t))
+                                if (!rowTableSerial(rs[l], scene, t))
                                     for (int j = 0; j < 10; ++j) t[j] = 1u;
                                 for (int j = 0; j < 10; ++j) tab[size_t(base + l) * 10 + j] = t[j];
                             }
@@ -1059,7 +1212,13 @@ SearchResult Searcher::run(const SearchSpec &spec,
                         for (int c = 0; c < statHardN[size_t(k)] && ok; ++c) {
                             if (!hardC[c].matches(11u)) ok = false;
                         }
-                        if (!ok) aliveCount = 0;
+                        if (!ok) {
+                            // 这几轮的位与种子无关, 一死全死。必须把 alive[] 也
+                            // 清掉 —— 只把 aliveCount 置 0 的话, 后面按 alive[]
+                            // 逐个计数时仍然会把整块种子都算成"合格"。
+                            for (int l = 0; l < block; ++l) alive[size_t(l)] = 0;
+                            aliveCount = 0;
+                        }
                     }
                 }
 
@@ -1087,7 +1246,7 @@ SearchResult Searcher::run(const SearchSpec &spec,
                         if (!batch.rows(scene, lv, cnt, outs)) {
                             for (int i = 0; i < cnt; ++i) {
                                 quint32 t[10];
-                                if (!rowTableBySeed(rs[i], scene, t))
+                                if (!rowTableSerial(rs[i], scene, t))
                                     for (int j = 0; j < 10; ++j) t[j] = 1u;
                                 outs[i] = (lv >= 8) ? t[9] : t[lv + 1];
                             }

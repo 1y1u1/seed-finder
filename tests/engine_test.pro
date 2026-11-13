@@ -13,7 +13,9 @@ QMAKE_CXXFLAGS_RELEASE += -O2
 INCLUDEPATH += ../src/core
 
 SOURCES += engine_test.cpp \
-           ../src/core/seedengine.cpp
+           ../src/core/seedengine.cpp \
+           ../src/core/gpuhook.cpp
 
 HEADERS += ../src/core/seedengine.h \
+           ../src/core/gpuhook.h \
            ../src/core/zombiedata.h
