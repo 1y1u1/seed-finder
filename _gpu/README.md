@@ -1,7 +1,11 @@
 # GPU 加速（CUDA）
 
-主线（`main` 分支）是纯 CPU 实现。本目录只在 `gpu` 分支上有意义，且 **不进版本库**
-（`.gitignore` 里有 `/_gpu/`）——它是本机 CUDA 后端 + 对拍程序的归宿。
+CUDA 后端的实现与对拍程序都在这里，**已经入库**（`.gitignore` 只忽略构建产物：
+`*.obj` / `release/` / `Makefile*` / 日志）。
+
+`SeedFinder.pro` 用 `exists(_gpu/gpucuda.obj)` 探测：编出 `gpucuda.obj` 就用 GPU，
+没编出来就走 `src/core/gpuhook.cpp` 的空实现 —— 同一份源码、同一个 exe，
+不需要维护两套代码，也不需要出两个可执行文件。
 
 ## 现状
 
@@ -9,7 +13,7 @@ CUDA 后端已经接进主程序：
 
 - `src/core/gpuhook.h/.cpp` —— 后端抽象，纯 C++（不含 Qt、不含 CUDA 头）。
   没编 CUDA 时 `sf::createGpuBackend()` 返回 `nullptr`，引擎自动走 CPU，
-  `main` 分支和 11 个测试程序的行为完全不变。
+  11 个测试程序的行为完全不变。
 - `SeedFinder.pro` 末尾用 `exists(_gpu/gpucuda.obj)` 探测，存在才定义
   `SF_WITH_CUDA` 并链接 `gpucuda_backend.cpp` + `cudart`。
 - `sf::SearchSpec::gpu`（默认 1）。`Searcher::run` 先把每轮条件按轮连续展开
@@ -78,7 +82,8 @@ CPU 端瓶颈是 MT19937 初始化那条 **398 步串行链**（每步一次 32 
 | `gpucmp.cpp` | **主程序级**交叉对拍：18 个用例（3 场景 × 4 条件 + 6 个 autoStop），直接比 `SearchResult` |
 | `build_cuda_test.bat` | 编 `gpucuda_test.exe` |
 | `build_cmp.bat` | 编 `gpucmp.exe` |
-| `gpupipe.cpp` / `gpuprobe.cpp` | 早期 D3D11 原型（已被 CUDA 取代，仅留作参考） |
+
+（早期基于 D3D11 的原型已随 CUDA 版落地删除。）
 
 ## 构建
 
