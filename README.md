@@ -16,20 +16,21 @@
 
 程序会把**全部 4,294,967,296 个种子**从 `00000000` 扫到 `FFFFFFFF`，不需要你设数量。
 扫描时「输出种子数」下方会显示进度条和预估剩余时间，
-点 **暂停** 可以原地停下（按钮变成 **继续**），接着算即可，暂停时长不计入预估。24 核实测速度：
+点 **暂停** 可以原地停下（按钮变成 **继续**），接着算即可，暂停时长不计入预估。
 
-| 条件覆盖的轮数 | 全量扫描耗时 |
-|---|---|
-| 1 轮 | 约 1.5 分钟 |
-| 4 轮 | 约 6 分钟 |
-| 25 轮 | 约 25 分钟 |
+同一份程序有两套引擎，命中结果**逐位一致**：
 
-条件覆盖的轮数越多越慢。
+| 引擎 | 25 轮全量扫描 | 说明 |
+|---|---|---|
+| CUDA（勾上「用 GPU 加速」） | 约 **2 秒** | 需要 NVIDIA 显卡和驱动 |
+| CPU（默认回退） | 约 **25 分钟**（24 核） | 无显卡也能跑 |
+
+勾选框只有检测到可用显卡时才勾得上；扫不到的规模（2e5 个种子以下）、
+显卡不可用或计算中途出错时，引擎会自动退回 CPU，结果不变。
+
+条件覆盖的轮数越多越慢（CPU 侧因为做了去重，耗时其实基本不随轮数增长）。
 建议先点「开始查找」看几秒进度和命中数，觉得命中太少就按 **停止** 调整条件，
 不必等它跑完。
-
-（`gpu` 分支另有 CUDA 后端：勾上「用 GPU 加速」后 25 轮全量扫描只需 **2 秒左右**，
-退出码与结果和 CPU 路径逐位一致。2e5 个种子以下引擎会自动走 CPU。）
 
 结果按「满足轮数」从高到低排列；点一行，双击会把该种子的逐轮出怪表弹到最前。
 
@@ -156,6 +157,7 @@
 │   ├── main.cpp              入口 + 命令行开关
 │   ├── core/                 引擎层: 不依赖 Qt Widgets
 │   │   ├── seedengine.h/.cpp 出怪引擎: MT19937 复刻 / 规则表 / 多线程检索
+│   │   ├── gpuhook.h/.cpp    GPU 后端的抽象接口(未编 CUDA 时自动退化为空实现)
 │   │   └── zombiedata.h      20 种僵尸、场景、允许表
 │   ├── app/                  应用层: 无窗口
 │   │   ├── searchworker.h/.cpp  后台线程包装
@@ -168,6 +170,11 @@
 │       ├── detailview.h/.cpp    逐轮出怪表(可复用组件)
 │       ├── detaildialog.h/.cpp  详情弹窗(内嵌 DetailView)
 │       └── helppages.h/.cpp     使用说明 / 关于
+├── _gpu/                     CUDA 后端(可选, 没有就是纯 CPU 版)
+│   ├── gpucuda.h/.cu         设备端 kernel: 建表 + 判定
+│   ├── gpucuda_backend.cpp   把 kernel 包装成 sf::GpuBackend
+│   ├── gpucuda_test.cpp      kernel 逐位对拍 + 吞吐基准
+│   └── gpucmp.cpp            GPU 与 CPU 两条路径的交叉对拍(18 个用例)
 ├── resources/
 │   ├── res.qrc               白色对勾图标(复选框蓝底白勾)
 │   ├── check_white.png
@@ -184,6 +191,7 @@
 ```
 SeedFinder3.exe --selftest    # 引擎分页自检
 SeedFinder3.exe --presettest  # 预设存盘往返自检
+SeedFinder3.exe --badtest     # 条件校验的 11 组反例, 都应被拦下
 ```
 
 ### 引擎要点
@@ -197,24 +205,35 @@ SeedFinder3.exe --presettest  # 预设存盘往返自检
 - 检索同时维护两张规则表：`rankTable`（出怪条件，只计数）与 `hardTable`（全局条件，不满足即短路淘汰）。
 - 扫描的是**连续种子空间**（`seed += 1`），`r_val` 通过 `pos += INV` 递推得到，避免每个种子一次乘法。
   这一点比 v2.0 更符合「检查 N 个种子」的字面含义（v2.0 在 r_val 空间步进，相邻种子相差 101）。
+- **相邻轮次共用同一张选卡表**：因为 `INV * 101 ≡ 1 (mod 2^32)`，
+  `(种子 s, 第 lv 轮)` 与 `(种子 s+101, 第 lv-1 轮)` 的 `r_val` 完全相同，
+  两者算出的 `d1[10]` 自然一模一样。所以连续 N 个种子 × W 轮只需建 `N + 101*(W-1)` 张表，
+  而不是 `N*W` 张 —— 这也是 CPU 侧 25 轮和 5 轮耗时几乎相同的原因。
+  块内用 `memmove` 把上一块末尾的表挪到块首复用。
+- GPU 侧把同一条恒等式推到底：一个 CUDA 线程建一张表，判定阶段直接从显存读表，
+  全程不回主机；选卡表留在 48 MB 的 L2 里，25 轮里每张表只从显存取一次。
 
 ### 命令行开关（开发用）
 
 ```
 SeedFinder3.exe --selftest                # 引擎分页自检，OK 则退出码 0
 SeedFinder3.exe --presettest              # 预设存盘往返自检
+SeedFinder3.exe --badtest [n]             # 条件校验的 11 组反例(给 n 只跑第 n 组)
 SeedFinder3.exe --shot out.png            # 启动后 0.7 秒截图退出
 SeedFinder3.exe --runshot out.png         # 用当前参数跑一次查找，完成后截图退出
 SeedFinder3.exe --demo --runshot out.png  # 同上，但先装一套多条件演示参数
 SeedFinder3.exe --span 3000000 --runshot out.png   # 只扫前 300 万个种子(截图用)
+SeedFinder3.exe --lookup 1A2B3C4D         # 直接查看某个种子的逐轮出怪
+SeedFinder3.exe --progress 40 --shot out.png       # 把进度条拨到 40% 截图
 SeedFinder3.exe --dialog cond|band|detail|howto|about --shot out.png  # 各对话框截图
+SeedFinder3.exe --nogpu                   # 强制只用 CPU(排查 / 对比结果时用)
 ```
 
 ---
 
 ## 9. 构建
 
-需要 Qt 5.12.9 (MSVC2017 64bit) 与 VS2017 Build Tools。
+需要 Qt 5.12.9 (MSVC2017 64bit) 与 MSVC 生成工具（VS2017 及以上都可，VS2026 已实测通过）。
 
 ```bat
 call "...\VC\Auxiliary\Build\vcvars64.bat"
@@ -223,11 +242,37 @@ qmake ..\SeedFinder.pro -spec win32-msvc "CONFIG+=release"
 nmake release
 ```
 
-静态单文件版（不依赖任何 Qt DLL，约 13 MB）：
+静态单文件版（不依赖任何 Qt DLL，约 14 MB）：
 
 ```bat
 qmake ..\SeedFinder.pro -spec win32-msvc "CONFIG+=release" "CONFIG+=static"
 ```
+
+### 带 GPU 后端
+
+`_gpu/` 里是 CUDA 实现。工程用 `exists()` 探测 `_gpu/gpucuda.obj`：有就用它并定义
+`SF_WITH_CUDA`，没有就走 `src/core/gpuhook.cpp` 的空实现，同一份源码自动退化成纯 CPU 版。
+所以**不需要维护两份代码、也不需要两个 exe**。
+
+编译 CUDA 对象要另外调 `nvcc`（qmake 不认识 `.cu`）：
+
+```bat
+cd _gpu
+rem 动态版 (/MD), 给 SeedFinder.pro 的非 static 配置用
+nvcc -Xcompiler "/MD" -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH ^
+     -arch=sm_120 -O3 -c gpucuda.cu -o gpucuda.obj
+rem 静态版 (/MT), 给 CONFIG+=static 用 —— CRT 必须一致, 否则一堆 __imp_xxx 未解析
+nvcc -Xcompiler "/MT" -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH ^
+     -arch=sm_120 -O3 -c gpucuda.cu -o gpucuda_static.obj
+```
+
+`-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH` 是必需的：MSVC 14.4x 的 `<yvals_core.h>`
+硬性要求 `__CUDACC_VER_MAJOR__ >= 13.4`，撞不上这个宏时 `cudafe++` 会直接
+`0xC0000005` 崩掉，报错信息完全不指向真正原因。
+
+对拍与基准（`_gpu` 下）：`build_cuda_test.bat` 出 `gpucuda_test.exe`
+（`dump` / `check` / `pipe` / `tune` 四种模式），`build_cmp.bat` 出 `gpucmp.exe`
+（GPU 与 CPU 两条完整路径的 18 个用例交叉对拍，必须 `ALL OK`）。
 
 ---
 

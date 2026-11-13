@@ -47,7 +47,7 @@ DetailView::DetailView(QWidget *parent)
     // 不画交替行色: 只有"这一轮没满足"的行需要灰底, 两套条纹并存会互相干扰
     m_table->setAlternatingRowColors(false);
     m_table->verticalHeader()->setVisible(false);
-    m_table->verticalHeader()->setDefaultSectionSize(24);
+    m_table->verticalHeader()->setDefaultSectionSize(22);
     m_table->setShowGrid(false);
     // 各列都是定宽, 把表格横向撑满窗口只会多出一片右侧空白;
     // 让它按自身内容取宽, 外面再把窗口收到内容宽度
@@ -59,7 +59,6 @@ DetailView::DetailView(QWidget *parent)
 
 void DetailView::clear()
 {
-    m_seed = 0;
     m_rows.clear();
     m_cols.clear();
     m_table->clear();
@@ -74,7 +73,6 @@ void DetailView::clear()
 void DetailView::setData(quint32 seed, int scene, const std::vector<sf::DetailRow> &rows,
                          const sf::RuleTable &rank, const sf::RuleTable &hard)
 {
-    m_seed = seed;
     m_rows = rows;
     m_rankTable = rank;
     m_hardTable = hard;
@@ -115,7 +113,6 @@ void DetailView::rebuild()
         m_summary->setText(QString::fromUtf8("没有可显示的出怪数据"));
         return;
     }
-    QVector<int> showIdx;
     int ruled = 0, matched = 0, hardRuled = 0;
     for (int i = 0; i < int(m_rows.size()); ++i) {
         const sf::DetailRow &r = m_rows[size_t(i)];
@@ -124,12 +121,11 @@ void DetailView::rebuild()
             if (r.matched) ++matched;
         }
         if (r.hasHard) ++hardRuled;
-        showIdx << i;
     }
 
-    m_table->setRowCount(showIdx.size());
-    for (int k = 0; k < showIdx.size(); ++k) {
-        const sf::DetailRow &r = m_rows[size_t(showIdx[k])];
+    m_table->setRowCount(m_rows.size());
+    for (int k = 0; k < int(m_rows.size()); ++k) {
+        const sf::DetailRow &r = m_rows[size_t(k)];
 
         // 只留一列"已完成 F 数"。原来的"轮次"列承担两个视觉信号, 现在搬到这里:
         // 这一轮有条件就加粗, 有条件但没满足就变灰 —— 一眼能看出哪些轮要检查、哪轮没过。

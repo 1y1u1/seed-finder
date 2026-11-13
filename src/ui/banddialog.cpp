@@ -19,7 +19,8 @@ BandDialog::BandDialog(int scene, int outerBegin, int outerEnd, QWidget *parent)
     setWindowTitle(QString::fromUtf8("编辑出怪条件"));
     // 去掉标题栏上的"这是什么?"按钮：点它只会进入上下文帮助模式, 但没有内容可显示
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    setMinimumWidth(560);
+    // 宽度按内容定, 与 CondDialog / DetailDialog 一样不写死大值
+    setMinimumWidth(420);
     buildUi();
     refreshSummary();
 }
@@ -27,8 +28,8 @@ BandDialog::BandDialog(int scene, int outerBegin, int outerEnd, QWidget *parent)
 void BandDialog::buildUi()
 {
     QVBoxLayout *root = new QVBoxLayout(this);
-    root->setContentsMargins(16, 16, 16, 16);
-    root->setSpacing(10);
+    root->setContentsMargins(10, 10, 10, 10);
+    root->setSpacing(8);
 
     m_titleRange = new QLabel(QString::fromUtf8("范围"));
     m_titleRange->setObjectName("CardTitle");
@@ -213,8 +214,7 @@ void BandDialog::onAccept()
     accept();
 }
 
-void BandDialog::setSiblings(const QVector<sf::RuleBand> &siblings, bool hard)
+void BandDialog::setSiblings(const QVector<sf::RuleBand> &siblings)
 {
-    Q_UNUSED(hard)
     m_siblings = siblings;
 }

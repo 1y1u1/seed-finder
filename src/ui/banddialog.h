@@ -27,7 +27,7 @@ public:
 
     // 同一张表里的其他条件: 点"确定"时用来检查跨段矛盾 (例如 A 段禁出小丑、
     // B 段又要求必出小丑且两段重叠)。不设也不会崩, 只是跳过那一条检查。
-    void setSiblings(const QVector<sf::RuleBand> &siblings, bool hard);
+    void setSiblings(const QVector<sf::RuleBand> &siblings);
 
 private slots:
     void onEditCondition();

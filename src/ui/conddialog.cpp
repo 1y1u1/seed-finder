@@ -120,7 +120,7 @@ void CondDialog::buildUi()
         m_table->setColumnWidth(c, 46);
     }
     m_table->verticalHeader()->setDefaultSectionSize(kRowH);
-    // 表头也要压: QSS 里 QHeaderView::section 有 5px 上下内边距, 不设死高度的话
+    // 表头也要压: QSS 里 QHeaderView::section 有 2px 上下内边距, 不设死高度的话
     // 光表头就占 30px。这里定死 22, 换行不了也无所谓 (列头都是两个字)。
     m_table->horizontalHeader()->setFixedHeight(kHeadH);
     // 勾选框自己居中画 (见上面的 CenteredCheckDelegate)

@@ -15,8 +15,8 @@ QFrame *card(const QString &title, const QString &body)
     QFrame *f = new QFrame;
     f->setObjectName("Card");
     QVBoxLayout *lay = new QVBoxLayout(f);
-    lay->setContentsMargins(14, 12, 14, 12);
-    lay->setSpacing(6);
+    lay->setContentsMargins(8, 2, 8, 2);
+    lay->setSpacing(3);
 
     QLabel *t = new QLabel(title);
     t->setObjectName("CardTitle");
@@ -46,8 +46,8 @@ void buildShell(QDialog *dlg, const QString &titleText, QWidget *content,
     dlg->setMinimumSize(size);
 
     QVBoxLayout *root = new QVBoxLayout(dlg);
-    root->setContentsMargins(16, 16, 16, 16);
-    root->setSpacing(10);
+    root->setContentsMargins(10, 10, 10, 10);
+    root->setSpacing(8);
 
     QScrollArea *sa = new QScrollArea(dlg);
     sa->setWidgetResizable(true);

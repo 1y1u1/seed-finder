@@ -29,7 +29,6 @@ private:
     QTableWidget *m_table = nullptr;
     QLabel *m_summary = nullptr;
 
-    quint32 m_seed = 0;
     std::vector<sf::DetailRow> m_rows;
     sf::RuleTable m_rankTable;
     sf::RuleTable m_hardTable;

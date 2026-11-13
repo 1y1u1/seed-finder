@@ -359,19 +359,6 @@ bool rowTableSerial(quint32 rngSeed, int scene, quint32 d1[10])
     return buildRow(scene, draw, d1);
 }
 
-// 串行补算: 直接给 rngSeed 算该轮上场表
-bool rowBitsBySeed(quint32 rngSeed, int scene, int level, quint32 &out)
-{
-    if (level <= 0) {
-        out = 11u;
-        return true;
-    }
-    quint32 d1[10];
-    if (!rowTableSerial(rngSeed, scene, d1)) return false;
-    out = (level >= 8) ? d1[9] : d1[level + 1];
-    return true;
-}
-
 } // namespace
 
 bool rowTableBySeed(quint32 rngSeed, int scene, quint32 d1[10])
@@ -1123,7 +1110,10 @@ SearchResult Searcher::run(const SearchSpec &spec,
             int prevBlock = 0;                        // 上一块实际处理了几个种子
             std::vector<quint8> alive(size_t(kBlock), 0);
             std::vector<int> matched(size_t(kBlock), 0);
-            if (aCount > 0) {
+            // 只在真的走表缓存时才预留。!dedup 的查询 (轮跨度大到几千 F, 只查
+            // 头尾两轮) 根本不碰 tab, 但 advStride 的末项可能上百万, 无条件
+            // reserve 的话每个线程都要白占几十 MB (线程一多就是几百 MB)。
+            if (dedup && aCount > 0) {
                 tab.reserve(size_t(advStride[size_t(aCount - 1)] + blockCap) * 10);
             }
 

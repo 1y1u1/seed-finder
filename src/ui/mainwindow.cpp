@@ -374,7 +374,7 @@ QWidget *MainWindow::buildParamCard()
 
     int r = 0;
     // 第一行: 用户编号 / 存档编号 / 场景。
-    // 场景原本独占一行, 跟这两项并排之后参数卡少一行, 主界面才能压到 430 高。
+    // 场景原本独占一行, 跟这两项并排之后参数卡少一行, 主界面的高度才压得下来。
     addLabel(r, 0, QString::fromUtf8("用户编号"));
     m_uid = new QSpinBox;
     m_uid->setRange(1, 99);
@@ -484,8 +484,8 @@ QWidget *MainWindow::buildBandCard()
     m_bandTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_bandTable->setColumnWidth(0, kRangeColumnWidth);
     m_bandTable->verticalHeader()->setDefaultSectionSize(kConditionRowHeight);
-    // 表头也写死高度: QSS 里 QHeaderView::section 有 5px 上下内边距,
-    // 不设死的话光表头就占 26px, 3 行可见就塞不进 430 的窗口了。
+    // 表头也写死高度: QSS 里 QHeaderView::section 有 2px 上下内边距,
+    // 不设死的话光表头就占 22px, 3 行可见就要多占几像素高度。
     m_bandTable->horizontalHeader()->setFixedHeight(kConditionHeaderHeight);
     // 两张条件表高度一致 (表头 + 3 行), 左右两块卡片看起来才整齐
     m_bandTable->setFixedHeight(kConditionTableHeight);
@@ -533,8 +533,9 @@ QWidget *MainWindow::buildGlobalCard()
     m_globalTable->setColumnWidth(0, kRangeColumnWidth);
     m_globalTable->verticalHeader()->setDefaultSectionSize(kConditionRowHeight);
     m_globalTable->horizontalHeader()->setFixedHeight(kConditionHeaderHeight);
-    // 与「出怪条件」表同样高度, 两块卡片对齐
+    // 与「出怪条件」表同样高度和尺寸策略, 两块卡片对齐
     m_globalTable->setFixedHeight(kConditionTableHeight);
+    m_globalTable->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     connect(m_globalTable, &QTableWidget::doubleClicked, this, [this](const QModelIndex &) {
         onEditGlobal();
     });
@@ -543,8 +544,10 @@ QWidget *MainWindow::buildGlobalCard()
     QHBoxLayout *row = new QHBoxLayout;
     row->setSpacing(6);
     QPushButton *add = new QPushButton(QString::fromUtf8("添加"));
+    add->setObjectName("Primary");
     connect(add, &QPushButton::clicked, this, &MainWindow::onAddGlobal);
     QPushButton *del = new QPushButton(QString::fromUtf8("删除"));
+    del->setObjectName("Danger");
     connect(del, &QPushButton::clicked, this, &MainWindow::onRemoveGlobal);
     row->addWidget(add);
     row->addWidget(del);
@@ -603,7 +606,8 @@ QWidget *MainWindow::buildResultCard()
     m_resultTable->setColumnWidth(0, 88);
     m_resultTable->setColumnWidth(1, 88);
     m_resultTable->horizontalHeader()->setDefaultAlignment(Qt::AlignCenter);
-    m_resultTable->verticalHeader()->setDefaultSectionSize(26);
+    // 行高跟条件表和详情表一个量级: 11px 字号下 26 太松, 一屏少显示好几行
+    m_resultTable->verticalHeader()->setDefaultSectionSize(22);
     m_resultTable->setFont(QFont(QString::fromUtf8("Consolas"), 10));
     connect(m_resultTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::onSeedPicked);
     connect(m_resultTable, &QTableWidget::itemDoubleClicked, this, [this](QTableWidgetItem *it) {
@@ -756,7 +760,7 @@ void MainWindow::onAddBand()
 {
     BandDialog dlg(currentScene(), kOuterBegin, kOuterEnd, this);
     // 同时把已有条件交给对话框, 点"确定"时就能拦下跨段矛盾 (不用等开始查找)
-    dlg.setSiblings(m_bands, false);
+    dlg.setSiblings(m_bands);
     // 不预填范围: 两个框留空("—"), 由用户自己填, 点"确定"时空着会报错。
     // 以前这里塞了 3~12 的默认值, 用户不留神就带着一个没想过的区间去查。
     if (dlg.exec() != QDialog::Accepted) return;
@@ -779,7 +783,7 @@ void MainWindow::onEditBand()
     // 兄弟列表要排除自己, 否则"自己跟自己重叠"永远成立
     QVector<sf::RuleBand> others = m_bands;
     others.remove(row);
-    dlg.setSiblings(others, false);
+    dlg.setSiblings(others);
     dlg.setBand(m_bands[row]);
     if (dlg.exec() != QDialog::Accepted) return;
     sf::RuleBand b = dlg.band();
@@ -801,7 +805,7 @@ void MainWindow::onAddGlobal()
 {
     BandDialog dlg(currentScene(), kOuterBegin, kOuterEnd, this);
     dlg.setHardMode(true);
-    dlg.setSiblings(m_hard, true);
+    dlg.setSiblings(m_hard);
     // 同样不预填范围, 留空让用户填
     if (dlg.exec() != QDialog::Accepted) return;
 
@@ -823,7 +827,7 @@ void MainWindow::onEditGlobal()
     dlg.setHardMode(true);
     QVector<sf::RuleBand> others = m_hard;
     others.remove(row);
-    dlg.setSiblings(others, true);
+    dlg.setSiblings(others);
     dlg.setBand(m_hard[row]);
     if (dlg.exec() != QDialog::Accepted) return;
     sf::RuleBand b = dlg.band();
@@ -1016,8 +1020,8 @@ void MainWindow::onFinished(const sf::SearchResult &result)
 
     fillResultTable();
 
-    // 完成态文案必须压成一行: 状态标签与进度条并排, 左边只剩约 290px。
-    // 换成两行会把左栏撑出滚动条 (主界面锁在 430 高, 纵向没有余量),
+    // 完成态文案必须压成一行: 左栏只有 400 宽, 换成两行就会把纵向撑出滚动条
+    // (主界面高度是定值, 纵向没有余量),
     // 所以这里不用整句, 只留"几个种子 / 满足多少 / 几秒"三个数。
     const QString tail = result.stopped ? QString::fromUtf8("，已中断")
                          : (result.enoughFound ? QString::fromUtf8("，早停") : QString());
@@ -1216,7 +1220,7 @@ void MainWindow::fillResultTable()
     }
 }
 
-// 范围 / 条件表都按"当前界面"重算: 之前直接用 m_rankTable/m_hardTable,
+// 范围 / 条件表都按"当前界面"重算: 之前直接用缓存的规则表,
 // 而它们只在 onStart 里重建, 用户改了条件却没重新查找时会画出过期的条件。
 std::vector<sf::DetailRow> MainWindow::detailRows(quint32 seed, sf::RuleTable *rank,
                                                  sf::RuleTable *hard) const

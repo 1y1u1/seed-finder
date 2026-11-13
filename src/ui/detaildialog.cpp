@@ -17,8 +17,8 @@ DetailDialog::DetailDialog(QWidget *parent)
     setMinimumSize(420, 420);
 
     QVBoxLayout *root = new QVBoxLayout(this);
-    root->setContentsMargins(14, 14, 14, 14);
-    root->setSpacing(9);
+    root->setContentsMargins(10, 10, 10, 10);
+    root->setSpacing(8);
 
     m_title = new QLabel(this);
     m_title->setObjectName("CardTitle");

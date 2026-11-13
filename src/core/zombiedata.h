@@ -5,8 +5,6 @@
 #include <QStringList>
 #include <QVector>
 
-#define U8(s) QString::fromUtf8(s)
-
 enum ZombieId {
     Z_REGULAR = 0,
     Z_CONE,
@@ -75,11 +73,11 @@ inline QString zombieAbbr(int id)
 // 场景下拉: 显示名 + 对应 scene 编号
 inline QStringList sceneDisplayNames()
 {
-    return QStringList() << U8("DE")
-                         << U8("NE")
-                         << U8("PE/FE")
-                         << U8("RE/ME")
-                         << U8("MGE/AQE");
+    return QStringList() << QString::fromUtf8("DE")
+                         << QString::fromUtf8("NE")
+                         << QString::fromUtf8("PE/FE")
+                         << QString::fromUtf8("RE/ME")
+                         << QString::fromUtf8("MGE/AQE");
 }
 
 inline QVector<int> sceneIds()

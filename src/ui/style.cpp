@@ -98,7 +98,7 @@ QPushButton {
     border-radius: 0;
     /* 上下内边距只给 2px, 再配一个固定的 min-height:
        主界面三张卡各有一行按钮, 高度定死之后卡片高度才可预测,
-       窗口压到 448 才不会因为字号变化而忽高忽低。 */
+       窗口压定之后才不会因为字号变化而忽高忽低。 */
     padding: 2px 12px;
     min-height: 20px;
     color: #222222;
