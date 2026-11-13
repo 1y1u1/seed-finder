@@ -177,7 +177,7 @@ QDialog *buildAbout(QWidget *parent)
     QLabel *title = new QLabel;
     title->setTextFormat(Qt::RichText);
     title->setText(head(QString::fromUtf8("植物大战僵尸 · 无尽种子查找器"),
-                        QString::fromUtf8("v3.0 · Qt 5.12.9 静态构建 · 零外部依赖")));
+                        QString::fromUtf8("v3.0 · Qt 5.12.9 静态构建 · 不需要另装 Qt 或运行时")));
     lay->addWidget(title);
 
     lay->addWidget(card(
