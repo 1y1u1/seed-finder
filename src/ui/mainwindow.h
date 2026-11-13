@@ -113,6 +113,8 @@ private:
     QSpinBox *m_mode = nullptr;
     QComboBox *m_scene = nullptr;
     QSpinBox *m_outputSize = nullptr;
+    // GPU 加速开关: 只有后端可用时才勾得上 (没编 CUDA / 没设备时置灰)
+    QCheckBox *m_useGpu = nullptr;
 
     // 出怪条件 / 全局条件
     QTableWidget *m_bandTable = nullptr;

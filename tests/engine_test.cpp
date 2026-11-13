@@ -53,6 +53,35 @@ int main(int argc, char **argv)
         if (bad) return 1;
     }
 
+    // ---- 2b. WaveOracle::bitsOfSeed 必须等于"按 rngSeed 直接建表"的结果 ----
+    // 回归测试: bitsOfSeed 以前漏加 level, 每轮都取到第 0 轮那张表的位。
+    {
+        const sf::WaveOracle oracle(2);
+        int bad = 0;
+        quint32 seed = 0x0BADF00Du;
+        for (int k = 0; k < 200; ++k, seed += 99991u) {
+            for (int lv = 1; lv <= 25; ++lv) {
+                const quint32 rngSeed = quint32(quint64(seed) + 14ull + 101ull * quint64(lv));
+                quint32 d1[10];
+                if (!sf::rowTableBySeed(rngSeed, 2, d1)) continue;
+                const quint32 want = sf::rowBits(d1, lv);
+                const quint32 got = oracle.bitsOfSeed(seed, 14, lv);
+                if (want != got) {
+                    if (bad == 0) {
+                        out << "  seed=" << QString::number(seed, 16)
+                            << " lv=" << lv
+                            << " want=0x" << QString::number(want, 16)
+                            << " got=0x" << QString::number(got, 16) << endl;
+                    }
+                    ++bad;
+                }
+            }
+        }
+        out << "bitsOfSeed vs rowTableBySeed: " << (bad == 0 ? "OK" : "MISMATCH")
+            << " (bad=" << bad << ")" << endl;
+        if (bad) return 1;
+    }
+
     // ---- 3. 性能: 100 万种子 x 25 波 ----
     {
         sf::SearchSpec spec;

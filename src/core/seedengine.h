@@ -177,9 +177,13 @@ public:
         return rowBits(d1, level);
     }
     // 便捷入口: 直接按种子 + 轮号取
+    // 第 level 轮的 rngSeed 是 seed + offset + 101 * level, 所以 pos 要加上 level:
+    // rVal(seed + 101*level) = rVal(seed) + level (因为 INV * 101 ≡ 1)。
+    // 少加这一项的话, 每一轮取到的都是第 0 轮那张表里的位。
     inline quint32 bitsOfSeed(quint32 seed, int offset, int level) const
     {
-        return bits(seedToRVal(seed, offset), level);
+        if (level <= 0) return 11u;
+        return bits(quint32(seedToRVal(seed, offset) + quint32(level)), level);
     }
 
 private:
@@ -284,6 +288,7 @@ struct SearchResult
     int waveEnd = 0;
     bool stopped = false;
     bool enoughFound = false;       // 因达到 autoStop 目标而提前结束
+    bool usedGpu = false;           // 这一轮真的由 GPU 算完的 (界面据此提示)
     double seconds = 0.0;
     QString error;
 

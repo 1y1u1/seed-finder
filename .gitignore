@@ -44,8 +44,15 @@ debug/
 /seed-finder-qt-main1.2/
 /_ssh/
 
-# GPU 原型的源码在 gpu 分支 (main 分支只留本地编译产物, 不入库)
-/_gpu/
+# GPU 后端的源码在 gpu 分支入库; main 分支上这个目录根本不存在。
+# 只忽略构建产物 (nvcc/qmake 的 obj、release/、日志、Makefile)。
+# 用 _gpu/* 而不是 /_gpu/ —— 整个目录忽略掉的话 add -f 也要一个一个来。
+/_gpu/Makefile*
+/_gpu/.qmake.stash
+/_gpu/*.obj
+/_gpu/release/
+/_gpu/debug/
+/_gpu/*.log
 
 # ---- 编辑器 / 系统 ----
 .vs/

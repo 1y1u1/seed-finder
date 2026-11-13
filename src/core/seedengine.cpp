@@ -1027,6 +1027,7 @@ SearchResult Searcher::run(const SearchSpec &spec,
                     res.qualified = gcol.qualified(0);
                     res.stopped = cancelHit.load(std::memory_order_relaxed);
                     res.enoughFound = goalHit.load(std::memory_order_relaxed);
+                    res.usedGpu = true;
                     res.seconds = double(timer.elapsed()) / 1000.0;
                     if (onProgress) onProgress(100, res.scanned, res.qualified);
                     return res;

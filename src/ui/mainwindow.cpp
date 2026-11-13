@@ -4,6 +4,7 @@
 #include "conddialog.h"
 #include "detaildialog.h"
 #include "detailview.h"
+#include "gpuhook.h"
 #include "helppages.h"
 #include "searchworker.h"
 
@@ -379,6 +380,14 @@ QWidget *MainWindow::buildParamCard()
     m_outputSize->setRange(1, 500);
     m_outputSize->setValue(20);
     g->addWidget(m_outputSize, r, 1);
+
+    // GPU 开关: 只有真的编进了 CUDA 后端并且有可用设备时才可选,
+    // 否则置灰勾不上 (此时引擎本来也只会走 CPU)。
+    // 跟"输出种子数"同一行, 免得参数卡长高一行把左栏撑出滚动条。
+    m_useGpu = new QCheckBox(QString::fromUtf8("用 GPU 加速"));
+    m_useGpu->setChecked(sf::gpuBackendReady());
+    m_useGpu->setEnabled(sf::gpuBackendReady());
+    g->addWidget(m_useGpu, r, 2, 1, 2);
     ++r;
 
     g->setColumnStretch(1, 1);
@@ -655,6 +664,9 @@ sf::SearchSpec MainWindow::currentSpec(QString *error) const
     spec.autoStop = quint64(m_outputSize->value());
     spec.bands = m_bands;
     spec.hard = m_hard;
+    // 没勾"用 GPU 加速"或者后端不可用时走 CPU。引擎自己也会在小规模检索时
+    // 退回 CPU, 所以这里只是用户的显式选择。
+    spec.gpu = (m_useGpu && m_useGpu->isChecked()) ? 1 : 0;
 
     return spec;
 }
@@ -691,6 +703,8 @@ void MainWindow::setRunning(bool running)
     m_startBtn->setEnabled(!running);
     m_pauseBtn->setEnabled(running);
     m_stopBtn->setEnabled(running);
+    // 查找中锁住 GPU 开关: 改了也不会影响正在跑的这一轮, 反而让人以为生效了
+    if (m_useGpu) m_useGpu->setEnabled(!running && sf::gpuBackendReady());
     m_startBtn->setText(running ? QString::fromUtf8("查找中…") : QString::fromUtf8("开始查找"));
 }
 
@@ -1020,6 +1034,10 @@ void MainWindow::onFinished(const sf::SearchResult &result)
                          .arg(bigNumber(result.scanned))
                          .arg(result.seconds, 0, 'f', 2);
     }
+    // 让用户看得出这一轮到底是 GPU 算的还是 CPU 算的 ——
+    // 小规模检索和没勾"用 GPU 加速"时都会走 CPU, 不标出来容易误以为 GPU 生效了。
+    // 用短前缀: 中文括号会把状态文字挤成两行, 左栏就要出滚动条。
+    if (result.usedGpu) statusText.prepend(QStringLiteral("GPU · "));
     m_status->setText(statusText);
 
     if (m_resultTable->rowCount() == 0) {

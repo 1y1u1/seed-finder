@@ -1,6 +1,11 @@
 # 源码统一用 LF 存储, 避免 Windows 上 CRLF 反复变动
 * text=auto eol=lf
 
+# 例外: cmd 批处理必须是 CRLF。用 LF 存的话, cmd 会把一行当成多条命令,
+# 报 "'ft' is not recognized" 这种莫名错误。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 *.png binary
 *.ico binary
 *.exe binary
