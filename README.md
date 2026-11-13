@@ -148,7 +148,7 @@
 ## 8. 源码结构
 
 ```
-seedfinder3/
+/
 ├── SeedFinder.pro            qmake 工程 (唯一的构建入口)
 ├── src/
 │   ├── main.cpp              入口 + 命令行开关
@@ -217,14 +217,14 @@ SeedFinder3.exe --dialog cond|band|detail|howto|about --shot out.png  # 各对�
 ```bat
 call "...\VC\Auxiliary\Build\vcvars64.bat"
 set PATH=<Qt>\bin;%PATH%
-qmake ..\..\seedfinder3\SeedFinder.pro -spec win32-msvc "CONFIG+=release"
+qmake ..\SeedFinder.pro -spec win32-msvc "CONFIG+=release"
 nmake release
 ```
 
 静态单文件版（不依赖任何 Qt DLL，约 13 MB）：
 
 ```bat
-qmake ..\..\seedfinder3\SeedFinder.pro -spec win32-msvc "CONFIG+=release" "CONFIG+=static"
+qmake ..\SeedFinder.pro -spec win32-msvc "CONFIG+=release" "CONFIG+=static"
 ```
 
 ---

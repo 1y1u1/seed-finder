@@ -127,8 +127,11 @@ private:
         }
     };
     page p0, p1;
-    int cur;
-    int scene;
+    // cur 必须显式初始化: get() 用 "t != cur && t != cur + 1" 判断要不要翻页,
+    // 留成栈垃圾值时, 若垃圾值恰好等于目标页号就会跳过加载, 直接读到未初始化的
+    // data[][]。构造函数里 p0/p1 装的是第 0/1 页, 所以 cur 的初值是 0。
+    int cur = 0;
+    int scene = 0;
 
 public:
     d_page() {}
@@ -137,6 +140,7 @@ public:
         scene = sc;
         p0.init(sc, 0);
         p1.init(sc, 1);
+        cur = 0;
     }
     int get(uint32_t pos, int level)
     {
