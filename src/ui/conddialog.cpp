@@ -68,7 +68,14 @@ public:
         // 按下时翻一次, 再把双击吞掉, 双击的结果就是"勾上"。
         if (event->type() == QEvent::MouseButtonDblClick) return true;
         if (event->type() != QEvent::MouseButtonPress) return false;
-        const bool on = index.data(Qt::CheckStateRole).toInt() == Qt::Checked;
+        // 名字那一列根本没有勾选状态, 必须在这里挡住。
+        // 不挡的话 toInt() 拿到 0 当成"未勾选", 于是往下写 Qt::Checked,
+        // QTableWidgetItem::setData(CheckStateRole) 会顺手把
+        // ItemIsUserCheckable 也加上, 结果点一下名字就在名字上画出一个勾选框,
+        // 把僵尸名盖住了, 而右边四列反倒一个都没勾上。
+        const QVariant cs = index.data(Qt::CheckStateRole);
+        if (!cs.isValid()) return false;
+        const bool on = cs.toInt() == Qt::Checked;
         return model->setData(index, on ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
     }
 };

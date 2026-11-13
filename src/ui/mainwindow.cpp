@@ -55,8 +55,9 @@ const int kConditionHeaderHeight = 20;
 const int kConditionTableHeight =
     kConditionHeaderHeight + 3 * kConditionRowHeight + 2 + 2;
 
-// 右栏宽度。只剩"种子输入框 124 + 查看出怪 ~90"这一行了, 300 就够。
-const int kRightWidth = 300;
+// 右栏宽度。只剩"种子输入框 104 + 查看出怪 ~90"这一行了, 240 就够。
+// 再宽就是给结果表留白: 种子列是 Stretch, 多出来的宽度全变空白。
+const int kRightWidth = 240;
 
 QString hex8(quint32 v)
 {
@@ -577,7 +578,8 @@ QWidget *MainWindow::buildResultCard()
     m_seedInput = new QLineEdit;
     m_seedInput->setPlaceholderText(QString::fromUtf8("种子，如 1A2B3C4D"));
     m_seedInput->setMaxLength(8);
-    m_seedInput->setFixedWidth(124);
+    // 8 位 Consolas 实测 88px, 加左右内边距 104 刚好填满, 不留空。
+    m_seedInput->setFixedWidth(104);
     m_seedInput->setFont(QFont(QString::fromUtf8("Consolas"), 10));
     // 只允许 16 进制字符
     m_seedInput->setValidator(new QRegExpValidator(QRegExp(QString::fromUtf8("[0-9A-Fa-f]{1,8}")), this));
@@ -600,11 +602,15 @@ QWidget *MainWindow::buildResultCard()
     m_resultTable->setShowGrid(false);
     m_resultTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_resultTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
-    // 「满足轮数」定宽 88: 写成 Stretch 会把窗口剩余宽度全吃掉, 表格看着很宽,
+    // 「满足轮数」定宽 84: 实测表头"满足轮数"加粗后 72px, 加左右各 4px 内边距
+    // 是 80, 留 4px 余量。写成 Stretch 会把窗口剩余宽度全吃掉, 表格看着很宽,
     // 主界面也因此收不窄。多出来的宽度留给"种子"那一列。
     m_resultTable->horizontalHeader()->setStretchLastSection(false);
-    m_resultTable->setColumnWidth(0, 88);
-    m_resultTable->setColumnWidth(1, 88);
+    m_resultTable->setColumnWidth(1, 84);
+    // 竖向滚动条常驻: 滚动条一出现 viewport 就窄 10px, "满足轮数"整列左移 10px、
+    // "种子"列的居中文字左移 5px —— 结果一多就会看到整张表横向抖一下。
+    // 常驻之后宽度恒定, 列永远不跳; 代价是右边一直有一条 10px 的浅灰滚动条。
+    m_resultTable->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     m_resultTable->horizontalHeader()->setDefaultAlignment(Qt::AlignCenter);
     // 行高跟条件表和详情表一个量级: 11px 字号下 26 太松, 一屏少显示好几行
     m_resultTable->verticalHeader()->setDefaultSectionSize(22);
