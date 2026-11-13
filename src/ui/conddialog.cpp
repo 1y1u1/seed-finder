@@ -2,14 +2,77 @@
 #include "style.h"
 #include "zombiedata.h"
 
+#include <QApplication>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPainter>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QStyledItemDelegate>
 #include <QTableWidget>
 #include <QVBoxLayout>
+
+namespace {
+
+// 表格行高。19 行 × 26 太高, 一屏塞不下; 勾选框本身只有 14px,
+// 上下各留 2px 就够, 所以取 18。
+const int kRowH = 18;
+const int kHeadH = 22;
+
+// 勾选框在 QTableWidgetItem 里是画在格子左边的, textAlignment 只管文字,
+// 所以勾选框永远贴左。这里自己画: 背景交给 QStyledItemDelegate 照常画,
+// 勾选框挪到格子正中。
+// 点击也要一起接管 —— 默认的 editorEvent 只在原来那个靠左的小方块范围内才响应,
+// 否则会出现"看着在中间, 点它却没反应"。
+class CenteredCheckDelegate : public QStyledItemDelegate
+{
+public:
+    explicit CenteredCheckDelegate(QObject *parent = nullptr)
+        : QStyledItemDelegate(parent) {}
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option,
+               const QModelIndex &index) const override
+    {
+        const QVariant v = index.data(Qt::CheckStateRole);
+        if (!v.isValid()) {            // 名字那一列没有勾选框, 照常画
+            QStyledItemDelegate::paint(painter, option, index);
+            return;
+        }
+        // 勾选格只画背景 (交替行色、边框都在 PE_PanelItemViewItem 里),
+        // 不走 QStyledItemDelegate::paint —— 它会把默认的勾选框一起画出来,
+        // 清 HasCheckIndicator 也拦不住 (QSS 生效时由 QStyleSheetStyle 决定),
+        // 结果是格子里并排出现两个方框。
+        QStyleOptionViewItem opt(option);
+        initStyleOption(&opt, index);
+        opt.text.clear();
+        opt.features &= ~QStyleOptionViewItem::HasCheckIndicator;
+        QStyle *st = option.widget ? option.widget->style() : QApplication::style();
+        st->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter, option.widget);
+
+        const int side = 14;   // 与 style.cpp 里 QTableWidget::indicator 的宽高一致
+        opt.rect = QRect(option.rect.center().x() - side / 2,
+                         option.rect.center().y() - side / 2, side, side);
+        opt.state &= ~(QStyle::State_On | QStyle::State_Off);
+        opt.state |= (v.toInt() == Qt::Checked) ? QStyle::State_On : QStyle::State_Off;
+        st->drawPrimitive(QStyle::PE_IndicatorItemViewItemCheck, &opt, painter, option.widget);
+    }
+
+    bool editorEvent(QEvent *event, QAbstractItemModel *model,
+                     const QStyleOptionViewItem &, const QModelIndex &index) override
+    {
+        // 在"按下"时就翻, 不在"抬起"时翻: 双击的事件序列是
+        // 按下 / 抬起 / 双击 / 抬起, 若在抬起时翻就会翻两次, 双击等于没点。
+        // 按下时翻一次, 再把双击吞掉, 双击的结果就是"勾上"。
+        if (event->type() == QEvent::MouseButtonDblClick) return true;
+        if (event->type() != QEvent::MouseButtonPress) return false;
+        const bool on = index.data(Qt::CheckStateRole).toInt() == Qt::Checked;
+        return model->setData(index, on ? Qt::Unchecked : Qt::Checked, Qt::CheckStateRole);
+    }
+};
+
+} // namespace
 
 CondDialog::CondDialog(int scene, QWidget *parent)
     : QDialog(parent), m_scene(scene)
@@ -18,9 +81,9 @@ CondDialog::CondDialog(int scene, QWidget *parent)
     // 去掉标题栏上的"这是什么?"按钮：程序没有设置任何 whatsThis 文本, 点它只会
     // 进入上下文帮助模式却没有内容可显示, 看起来像失灵
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    // 窗口宽度由内容决定: 名字一列定宽 96、四个勾选列 56, 合计约 320,
-    // 所以整窗收到 400 就够, 不再固定 560。
-    setFixedWidth(400);
+    // 名字一列 76、四个勾选列各 46, 加边框和边距约 290, 窗口收到 320 就够。
+    // (僵尸名都是两个字, 76 已经留足; 勾选列 46 放 14px 的方框绰绰有余。)
+    setFixedWidth(320);
     buildUi();
     rebuildTable();
 }
@@ -28,8 +91,8 @@ CondDialog::CondDialog(int scene, QWidget *parent)
 void CondDialog::buildUi()
 {
     QVBoxLayout *root = new QVBoxLayout(this);
-    root->setContentsMargins(14, 14, 14, 14);
-    root->setSpacing(10);
+    root->setContentsMargins(10, 10, 10, 10);
+    root->setSpacing(8);
 
     QLabel *title = new QLabel(QString::fromUtf8("出怪要求"));
     title->setObjectName("CardTitle");
@@ -47,15 +110,20 @@ void CondDialog::buildUi()
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setShowGrid(false);
     m_table->horizontalHeader()->setStretchLastSection(false);
-    // 僵尸名居中, 名字一列定宽 (四个勾选列各 56), 窗口因此能收到很窄
+    // 僵尸名居中, 名字一列定宽 (四个勾选列各 46), 窗口因此能收到很窄
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
-    m_table->setColumnWidth(0, 96);
+    m_table->setColumnWidth(0, 76);
     m_table->horizontalHeader()->setDefaultAlignment(Qt::AlignCenter);
     for (int c = 1; c < 5; ++c) {
         m_table->horizontalHeader()->setSectionResizeMode(c, QHeaderView::Fixed);
-        m_table->setColumnWidth(c, 56);
+        m_table->setColumnWidth(c, 46);
     }
-    m_table->verticalHeader()->setDefaultSectionSize(26);
+    m_table->verticalHeader()->setDefaultSectionSize(kRowH);
+    // 表头也要压: QSS 里 QHeaderView::section 有 5px 上下内边距, 不设死高度的话
+    // 光表头就占 30px。这里定死 22, 换行不了也无所谓 (列头都是两个字)。
+    m_table->horizontalHeader()->setFixedHeight(kHeadH);
+    // 勾选框自己居中画 (见上面的 CenteredCheckDelegate)
+    m_table->setItemDelegate(new CenteredCheckDelegate(m_table));
     connect(m_table, &QTableWidget::itemChanged, this, [this](QTableWidgetItem *item) {
         if (!item || item->column() == 0) return;
         const int row = item->row();
@@ -81,25 +149,25 @@ void CondDialog::buildUi()
     root->addWidget(m_table, 1);
 
     // --- 至少 / 至多 的数量 ---
-    // 文案压到最短: 「至少出」 [2] 种　「至多出」 [2] 种, 整行才放得进窄窗口
+    // 文案压到最短: 「至少出」 [2] 种　「至多出」 [2] 种, 整行才放得进 320 宽的窗口
     QHBoxLayout *cnt = new QHBoxLayout;
-    cnt->setSpacing(6);
+    cnt->setSpacing(4);
 
     m_atLeastLabel = new QLabel(QString::fromUtf8("「至少出」"));
     cnt->addWidget(m_atLeastLabel);
     m_atLeastSpin = new QSpinBox(this);
     m_atLeastSpin->setRange(0, 19);
-    m_atLeastSpin->setFixedWidth(56);
+    m_atLeastSpin->setFixedWidth(46);
     cnt->addWidget(m_atLeastSpin);
     cnt->addWidget(new QLabel(QString::fromUtf8("种")));
 
-    cnt->addSpacing(12);
+    cnt->addSpacing(8);
 
     m_atMostLabel = new QLabel(QString::fromUtf8("「至多出」"));
     cnt->addWidget(m_atMostLabel);
     m_atMostSpin = new QSpinBox(this);
     m_atMostSpin->setRange(0, 19);
-    m_atMostSpin->setFixedWidth(56);
+    m_atMostSpin->setFixedWidth(46);
     cnt->addWidget(m_atMostSpin);
     cnt->addWidget(new QLabel(QString::fromUtf8("种")));
     cnt->addStretch(1);
@@ -151,9 +219,7 @@ void CondDialog::rebuildTable()
 
     // 高度按行数算准: 之前窗口高度写死 620, 场景行数少时下面就空出近百像素;
     // 现在表格多高窗口就多高, 不铺满也不留白。
-    const int rowsH = m_table->horizontalHeader()->sizeHint().height()
-                      + m_rows.size() * 26
-                      + m_table->frameWidth() * 2 + 2;
+    const int rowsH = kHeadH + m_rows.size() * kRowH + m_table->frameWidth() * 2 + 2;
     m_table->setFixedHeight(rowsH);
     adjustSize();
     setFixedHeight(sizeHint().height());

@@ -42,14 +42,20 @@ const int kOuterEnd = 10000;
 
 // 左栏定宽。PE/FE 是僵尸种类最多的场景 (20 种), 条件列要能一行放下
 // "必出 " + 20 个单字简称, 否则最长的那条会被截成 "…"
-const int kLeftWidth = 452;
+const int kLeftWidth = 400;
 
 // 范围列只放 "11 到 40 F" 这种短串, 给死宽度免得挤压条件列
-const int kRangeColumnWidth = 96;
+const int kRangeColumnWidth = 88;
 
-// 出怪条件与全局条件两张表的高度统一: 表头 + 4 行, 不再留空行
-const int kConditionTableHeight = 128;
+// 出怪条件与全局条件两张表的高度统一: 表头 + 3 行可见, 再多就在表格里滚。
+// 行高与表头高都写死, 好让整窗高度降到 430 之后还塞得下 3 行。
+const int kConditionRowHeight = 16;
+const int kConditionHeaderHeight = 20;
+const int kConditionTableHeight =
+    kConditionHeaderHeight + 3 * kConditionRowHeight + 2 + 2;
 
+// 右栏宽度。只剩"种子输入框 124 + 查看出怪 ~90"这一行了, 300 就够。
+const int kRightWidth = 300;
 
 QString hex8(quint32 v)
 {
@@ -73,8 +79,9 @@ QFrame *makeCard(const QString &title, QWidget *child)
     QFrame *card = new QFrame;
     card->setObjectName("Card");
     QVBoxLayout *lay = new QVBoxLayout(card);
-    lay->setContentsMargins(11, 4, 11, 4);
-    lay->setSpacing(4);
+    // 上下边距压到 2: 三张卡各让出 4px, 合起来就是主界面能少掉的那 12px
+    lay->setContentsMargins(8, 2, 8, 2);
+    lay->setSpacing(2);
     QLabel *t = new QLabel(title);
     t->setObjectName("CardTitle");
     lay->addWidget(t);
@@ -88,13 +95,11 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowTitle(QString::fromUtf8("种子查找器 v3.0"));
-    // 左栏定宽 kLeftWidth, 右栏跟着窗口——结果表只剩两列, 不需要那么宽。
-    // 高度刚好放下"参数卡 + 两张条件表(kConditionTableHeight) + 按钮行",
-    // 不留大片空白; 查找时多出来的进度条只占 14px, 也能一起放下。
-    // 右栏下限由"只看全部满足 + 种子输入框 + 查看出怪"这一行决定, 比这更窄
-    // 就会把"查看出怪"按钮挤出去, 所以留 356。
-    resize(kLeftWidth + 380, 652);
-    setMinimumSize(kLeftWidth + 356, 520);
+    // 左栏定宽 kLeftWidth, 右栏定宽 kRightWidth。
+    // 高度 448 = 原来的 430 + 进度条单独占的那一行 (16 + 2px 间距)。
+    // 其余靠压行高 (16)、表头 (20)、卡片标题与按钮内边距塞进去, 不出滚动条。
+    resize(kLeftWidth + kRightWidth + 32, 448);
+    setMinimumSize(kLeftWidth + kRightWidth + 24, 448);
     buildUi();
 
     // 启动时不预置任何出怪条件: 用户自己从"添加"开始加,
@@ -344,8 +349,8 @@ QWidget *MainWindow::buildParamCard()
     QWidget *inner = new QWidget;
     QGridLayout *g = new QGridLayout(inner);
     g->setContentsMargins(0, 0, 0, 0);
-    g->setHorizontalSpacing(8);
-    g->setVerticalSpacing(4);
+    g->setHorizontalSpacing(6);
+    g->setVerticalSpacing(3);
 
     auto addLabel = [g](int row, int col, const QString &text) {
         QLabel *l = new QLabel(text);
@@ -354,6 +359,8 @@ QWidget *MainWindow::buildParamCard()
     };
 
     int r = 0;
+    // 第一行: 用户编号 / 存档编号 / 场景。
+    // 场景原本独占一行, 跟这两项并排之后参数卡少一行, 主界面才能压到 430 高。
     addLabel(r, 0, QString::fromUtf8("用户编号"));
     m_uid = new QSpinBox;
     m_uid->setRange(1, 99);
@@ -364,17 +371,16 @@ QWidget *MainWindow::buildParamCard()
     m_mode->setRange(1, 99);
     m_mode->setValue(13);
     g->addWidget(m_mode, r, 3);
-    ++r;
-
-    addLabel(r, 0, QString::fromUtf8("场景"));
+    addLabel(r, 4, QString::fromUtf8("场景"));
     m_scene = new QComboBox;
     m_scene->addItems(sceneDisplayNames());
     m_scene->setCurrentIndex(2);
-    g->addWidget(m_scene, r, 1, 1, 3);
+    g->addWidget(m_scene, r, 5);
     connect(m_scene, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &MainWindow::onSceneChanged);
     ++r;
 
+    // 第二行: 输出种子数 + GPU 开关
     addLabel(r, 0, QString::fromUtf8("输出种子数"));
     m_outputSize = new QSpinBox;
     m_outputSize->setRange(1, 500);
@@ -383,58 +389,57 @@ QWidget *MainWindow::buildParamCard()
 
     // GPU 开关: 只有真的编进了 CUDA 后端并且有可用设备时才可选,
     // 否则置灰勾不上 (此时引擎本来也只会走 CPU)。
-    // 跟"输出种子数"同一行, 免得参数卡长高一行把左栏撑出滚动条。
     m_useGpu = new QCheckBox(QString::fromUtf8("用 GPU 加速"));
     m_useGpu->setChecked(sf::gpuBackendReady());
     m_useGpu->setEnabled(sf::gpuBackendReady());
-    g->addWidget(m_useGpu, r, 2, 1, 2);
+    g->addWidget(m_useGpu, r, 2, 1, 4);
     ++r;
 
     g->setColumnStretch(1, 1);
     g->setColumnStretch(3, 1);
+    g->setColumnStretch(5, 2);
 
     // 状态文字: 按 v1.2 的布局放在「输出种子数」和「开始查找」之间。
-    // 至少给两行高度, 免得进度文字一行两行切换时下面的按钮跟着上下跳。
     m_status = new QLabel(QString::fromUtf8("就绪"));
     m_status->setObjectName("Stat");
     m_status->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     m_status->setWordWrap(true);
-    m_status->setMinimumHeight(24);
+    m_status->setMinimumHeight(14);
 
-    // 进度条: 只在查找过程中出现, 与状态文字同宽横排 (参考 1.2 版的位置),
-    // 平时隐藏所以不占地方。
+    // 进度条: 单独占一行, 固定在卡片上的位置, 一直显示。
+    // 以前是隐藏的、开始查找才出现, 结果是左栏高度在"点开始"和"跑完"两个时刻
+    // 各变一次, 会闪一下甚至临时撑出滚动条。常驻就没这个问题了。
     m_progress = new QProgressBar;
     m_progress->setRange(0, 100);
     m_progress->setValue(0);
     m_progress->setTextVisible(false);
-    m_progress->setVisible(false);
+    m_progress->setFixedHeight(16);
 
-    // 按钮行
+    // 按钮行。三个按钮等宽 (1:1:1): 原来"开始查找"占两份,
+    // 一行看过去宽度不均, 也不利于把左栏收窄。
     QHBoxLayout *btns = new QHBoxLayout;
-    btns->setSpacing(8);
+    btns->setSpacing(6);
     m_startBtn = new QPushButton(QString::fromUtf8("开始查找"));
     m_startBtn->setObjectName("Primary");
-    m_startBtn->setMinimumHeight(32);
     connect(m_startBtn, &QPushButton::clicked, this, &MainWindow::onStart);
     // 暂停键: 点一下原地暂停(文字变"继续"), 再点接着算。
     // 只在查找进行中可用, 暂停期间"开始查找"保持禁用, 避免暂停中又开一轮。
     m_pauseBtn = new QPushButton(QString::fromUtf8("暂停"));
-    m_pauseBtn->setMinimumHeight(32);
     m_pauseBtn->setEnabled(false);
     connect(m_pauseBtn, &QPushButton::clicked, this, &MainWindow::onPauseToggle);
     m_stopBtn = new QPushButton(QString::fromUtf8("停止"));
     m_stopBtn->setObjectName("Danger");
-    m_stopBtn->setMinimumHeight(32);
     m_stopBtn->setEnabled(false);
     connect(m_stopBtn, &QPushButton::clicked, this, &MainWindow::onStop);
 
+    // 状态文字在上, 进度条单独一行在下 (常驻, 不随查找显隐)。
     QVBoxLayout *wrap = new QVBoxLayout;
     wrap->setContentsMargins(0, 0, 0, 0);
-    wrap->setSpacing(6);
+    wrap->setSpacing(3);
     wrap->addWidget(inner);
     wrap->addWidget(m_status);
     wrap->addWidget(m_progress);
-    btns->addWidget(m_startBtn, 2);
+    btns->addWidget(m_startBtn, 1);
     btns->addWidget(m_pauseBtn, 1);
     btns->addWidget(m_stopBtn, 1);
     wrap->addLayout(btns);
@@ -449,7 +454,7 @@ QWidget *MainWindow::buildBandCard()
     QWidget *inner = new QWidget;
     QVBoxLayout *lay = new QVBoxLayout(inner);
     lay->setContentsMargins(0, 0, 0, 0);
-    lay->setSpacing(8);
+    lay->setSpacing(4);
 
     m_bandTable = new QTableWidget;
     m_bandTable->setColumnCount(2);
@@ -464,8 +469,11 @@ QWidget *MainWindow::buildBandCard()
     m_bandTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
     m_bandTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_bandTable->setColumnWidth(0, kRangeColumnWidth);
-    m_bandTable->verticalHeader()->setDefaultSectionSize(24);
-    // 两张条件表高度一致 (表头 + 4 行), 左右两块卡片看起来才整齐
+    m_bandTable->verticalHeader()->setDefaultSectionSize(kConditionRowHeight);
+    // 表头也写死高度: QSS 里 QHeaderView::section 有 5px 上下内边距,
+    // 不设死的话光表头就占 26px, 3 行可见就塞不进 430 的窗口了。
+    m_bandTable->horizontalHeader()->setFixedHeight(kConditionHeaderHeight);
+    // 两张条件表高度一致 (表头 + 3 行), 左右两块卡片看起来才整齐
     m_bandTable->setFixedHeight(kConditionTableHeight);
     m_bandTable->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     connect(m_bandTable, &QTableWidget::doubleClicked, this, [this](const QModelIndex &) {
@@ -494,7 +502,7 @@ QWidget *MainWindow::buildGlobalCard()
     QWidget *inner = new QWidget;
     QVBoxLayout *lay = new QVBoxLayout(inner);
     lay->setContentsMargins(0, 0, 0, 0);
-    lay->setSpacing(8);
+    lay->setSpacing(4);
 
     m_globalTable = new QTableWidget;
     m_globalTable->setColumnCount(2);
@@ -509,7 +517,8 @@ QWidget *MainWindow::buildGlobalCard()
     m_globalTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
     m_globalTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_globalTable->setColumnWidth(0, kRangeColumnWidth);
-    m_globalTable->verticalHeader()->setDefaultSectionSize(24);
+    m_globalTable->verticalHeader()->setDefaultSectionSize(kConditionRowHeight);
+    m_globalTable->horizontalHeader()->setFixedHeight(kConditionHeaderHeight);
     // 与「出怪条件」表同样高度, 两块卡片对齐
     m_globalTable->setFixedHeight(kConditionTableHeight);
     connect(m_globalTable, &QTableWidget::doubleClicked, this, [this](const QModelIndex &) {
@@ -539,23 +548,17 @@ QWidget *MainWindow::buildResultCard()
     lay->setContentsMargins(14, 12, 14, 12);
     lay->setSpacing(8);
 
+    // 标题、种子输入框、"查看出怪" 放在同一行: 纵向上省下一整行,
+    // 右栏能多显示一行结果 (主界面高度锁在 430)。
     QHBoxLayout *top = new QHBoxLayout;
+    top->setSpacing(8);
     QLabel *title = new QLabel(QString::fromUtf8("查找结果"));
     title->setObjectName("CardTitle");
     top->addWidget(title);
     top->addStretch(1);
-    lay->addLayout(top);
-
-    QHBoxLayout *filterRow = new QHBoxLayout;
-    filterRow->setSpacing(8);
-    m_fullOnly = new QCheckBox(QString::fromUtf8("只看全部满足"));
-    connect(m_fullOnly, &QCheckBox::toggled, this, &MainWindow::onFullOnlyToggled);
-    filterRow->addWidget(m_fullOnly);
-    filterRow->addStretch(1);
 
     // 种子输入框: 手动输入一个种子, 直接看它在条件覆盖范围内的出怪
-    // 不加"种子"两个字的小标签: placeholder 已经说明了要填什么, 省下的宽度
-    // 直接让整窗收窄 (这一行是右栏最宽的部件, 它决定主界面能收到多窄)。
+    // 不加"种子"两个字的小标签: placeholder 已经说明了要填什么。
     m_seedInput = new QLineEdit;
     m_seedInput->setPlaceholderText(QString::fromUtf8("种子，如 1A2B3C4D"));
     m_seedInput->setMaxLength(8);
@@ -564,12 +567,12 @@ QWidget *MainWindow::buildResultCard()
     // 只允许 16 进制字符
     m_seedInput->setValidator(new QRegExpValidator(QRegExp(QString::fromUtf8("[0-9A-Fa-f]{1,8}")), this));
     connect(m_seedInput, &QLineEdit::returnPressed, this, &MainWindow::onLookupSeed);
-    filterRow->addWidget(m_seedInput);
+    top->addWidget(m_seedInput);
     QPushButton *lookup = new QPushButton(QString::fromUtf8("查看出怪"));
     lookup->setObjectName("Ghost");
     connect(lookup, &QPushButton::clicked, this, &MainWindow::onLookupSeed);
-    filterRow->addWidget(lookup);
-    lay->addLayout(filterRow);
+    top->addWidget(lookup);
+    lay->addLayout(top);
 
     m_resultTable = new QTableWidget;
     m_resultTable->setColumnCount(2);
@@ -887,7 +890,6 @@ void MainWindow::onStart()
     m_resultTable->setRowCount(0);
     if (m_detailDlg) m_detailDlg->clear();
     m_progress->setValue(0);
-    m_progress->setVisible(true);
     m_lastResult = sf::SearchResult();
     // 上一轮可能停在"继续"上, 新的一轮要从"暂停"这个初始状态开始
     m_paused = false;
@@ -990,11 +992,6 @@ void MainWindow::onFinished(const sf::SearchResult &result)
     if (m_pauseBtn) m_pauseBtn->setText(QString::fromUtf8("暂停"));
     setRunning(false);
     m_progress->setValue(100);
-    // 先让进度条停在 100% 一小会儿再收起来, 否则"跑完瞬间进度条消失",
-    // 看不出到底是跑完了还是被中断了。要是在这期间又开了一轮就不收了。
-    QTimer::singleShot(1200, this, [this]() {
-        if (!m_running) m_progress->setVisible(false);
-    });
 
     if (!result.error.isEmpty()) {
         m_status->setText(result.error);
@@ -1010,33 +1007,33 @@ void MainWindow::onFinished(const sf::SearchResult &result)
 
     fillResultTable();
 
-    const QString stopped = result.stopped ? QString::fromUtf8("（已中断）")
-                            : (result.enoughFound ? QString::fromUtf8("（已找够，提前停止）") : QString());
+    // 完成态文案必须压成一行: 状态标签与进度条并排, 左边只剩约 290px。
+    // 换成两行会把左栏撑出滚动条 (主界面锁在 430 高, 纵向没有余量),
+    // 所以这里不用整句, 只留"几个种子 / 满足多少 / 几秒"三个数。
+    const QString tail = result.stopped ? QString::fromUtf8("，已中断")
+                         : (result.enoughFound ? QString::fromUtf8("，早停") : QString());
     const quint64 full = result.fullCount();
     QString statusText;
     if (full > 0) {
-        statusText = QString::fromUtf8("完成%1：检查 %2 个种子，全部满足 %3 个，用时 %4 秒")
-                         .arg(stopped)
+        statusText = QString::fromUtf8("%1 种子，全满足 %2，%3 秒")
                          .arg(bigNumber(result.scanned))
                          .arg(bigNumber(full))
                          .arg(result.seconds, 0, 'f', 2);
     } else if (!result.buckets.isEmpty()) {
         const int best = result.buckets.first().matched;
-        statusText = QString::fromUtf8("完成%1：检查 %2 个种子，没有全满足的；最好的是 %3 / %4 轮，用时 %5 秒")
-                         .arg(stopped)
+        statusText = QString::fromUtf8("%1 种子，最好 %2/%3，%4 秒")
                          .arg(bigNumber(result.scanned))
                          .arg(best)
                          .arg(result.activeWaves)
                          .arg(result.seconds, 0, 'f', 2);
     } else {
-        statusText = QString::fromUtf8("完成%1：检查 %2 个种子，没有任何结果，用时 %3 秒")
-                         .arg(stopped)
+        statusText = QString::fromUtf8("%1 种子，无结果，%2 秒")
                          .arg(bigNumber(result.scanned))
                          .arg(result.seconds, 0, 'f', 2);
     }
+    statusText += tail;
     // 让用户看得出这一轮到底是 GPU 算的还是 CPU 算的 ——
     // 小规模检索和没勾"用 GPU 加速"时都会走 CPU, 不标出来容易误以为 GPU 生效了。
-    // 用短前缀: 中文括号会把状态文字挤成两行, 左栏就要出滚动条。
     if (result.usedGpu) statusText.prepend(QStringLiteral("GPU · "));
     m_status->setText(statusText);
 
@@ -1081,7 +1078,6 @@ void MainWindow::finishShotIfNeeded()
 void MainWindow::showProgressForTest(int percent)
 {
     if (!m_progress) return;
-    m_progress->setVisible(true);
     m_progress->setValue(std::max(0, std::min(100, percent)));
     m_runClock.start();
     onProgress(std::max(0, std::min(100, percent)), 0, 0);
@@ -1158,11 +1154,10 @@ void MainWindow::onSeedPicked()
     showDetailFor(quint32(it->text().toUInt(nullptr, 16)));
 }
 
-// 把 m_lastResult 铺进结果表 (受"只看全部满足" 影响)
+// 把 m_lastResult 铺进结果表
 void MainWindow::fillResultTable()
 {
     const sf::SearchResult &result = m_lastResult;
-    const bool fullOnly = m_fullOnly && m_fullOnly->isChecked();
 
     // "输出种子数"是总共列多少个种子: 从满足轮数最多的档位往下取
     const int want = m_outputSize ? m_outputSize->value() : 20;
@@ -1176,7 +1171,6 @@ void MainWindow::fillResultTable()
     for (int i = 0; i < result.buckets.size() && rows < want; ++i) {
         const sf::CountBucket &b = result.buckets[i];
         const bool full = (b.matched == result.activeWaves);
-        if (fullOnly && !full) continue;
         // 一轮都没满足的种子不算"成绩", 不列出来;
         // 但只设了全局条件(没有出怪条件)时 activeWaves 就是 0, 这时能留下来的种子
         // 本身就是"全部满足", 不能按 0 轮淘汰, 否则界面会误报"没有结果"。
@@ -1210,15 +1204,6 @@ void MainWindow::fillResultTable()
         m_autoSelect = true;
         m_resultTable->selectRow(0);
         m_autoSelect = false;
-    }
-}
-
-void MainWindow::onFullOnlyToggled(bool)
-{
-    fillResultTable();
-    if (m_resultTable->rowCount() == 0) {
-        if (m_detailDlg) m_detailDlg->clear();
-        m_status->setText(QString::fromUtf8("当前筛选下没有结果；关掉“只看全部满足”可以看到差几轮的种子。"));
     }
 }
 

@@ -61,8 +61,9 @@ QLineEdit, QSpinBox, QComboBox {
     background: #ffffff;
     border: 1px solid #cccccc;
     border-radius: 0;
-    padding: 3px 8px;
-    min-height: 18px;
+    /* 参数卡有 6 个输入控件, 上下各压 1px 就把这一卡省下了一大截 */
+    padding: 2px 6px;
+    min-height: 16px;
     selection-background-color: #111111;
     selection-color: #ffffff;
 }
@@ -91,7 +92,9 @@ QPushButton {
     background: #ffffff;
     border: 1px solid #cccccc;
     border-radius: 0;
-    padding: 5px 14px;
+    /* 上下内边距只给 3px: 主界面三张卡各有一行按钮,
+       每行省 4px 合起来就是 12px, 正好是压到 430 高所缺的那点。 */
+    padding: 3px 12px;
     color: #222222;
 }
 QPushButton:hover {

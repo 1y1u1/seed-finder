@@ -60,7 +60,6 @@ private slots:
     void onShowAbout();
     void onSavePreset();
     void onLoadPreset();
-    void onFullOnlyToggled(bool on);
     void onLookupSeed();
 
 private:
@@ -127,7 +126,6 @@ private:
     QProgressBar *m_progress = nullptr;
     QLabel *m_status = nullptr;
     QLineEdit *m_seedInput = nullptr;
-    QCheckBox *m_fullOnly = nullptr;
     QPushButton *m_startBtn = nullptr;
     QPushButton *m_pauseBtn = nullptr;
     QPushButton *m_stopBtn = nullptr;
