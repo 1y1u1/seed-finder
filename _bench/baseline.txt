@@ -1,0 +1,37 @@
+[A] scanned=200000 qualified=200000 active=1 waves=5..6 stopped=0 enough=0 err=-
+   matched=1   total=59890    examples=00000005,00000008,00000009,0000000A,0000000B
+   matched=0   total=140110   examples=00000000,00000001,00000002,00000003,00000004
+[B] scanned=120000 qualified=0 active=10 waves=0..25 stopped=0 enough=0 err=-
+[C] qualified=10 enough=1 stopped=0 scanned=10
+[D] scanned=200000 qualified=200000 active=1 waves=2..3 stopped=0 enough=0 err=-
+   matched=1   total=68362    examples=00000000,00000001,00000006,00000008,00000009,0000000E,00000010,00000012,00000013,00000014
+   matched=0   total=131638   examples=00000002,00000003,00000004,00000005,00000007,0000000A,0000000B,0000000C,0000000D,0000000F
+[E] scanned=2000000 qualified=2000000 buckets=14 total=2000000 active=20 err=-
+[F1] scanned=0 qualified=0 buckets=0 total=0 active=0 err=F 数区间无效
+[F2] scanned=1 qualified=1 buckets=1 total=1 active=1 err=-
+[G] rows=24
+   lv=1   flag=2   bits=00000053 rule=0/0 hard=1/1
+   lv=2   flag=4   bits=00000039 rule=0/0 hard=1/0
+   lv=3   flag=6   bits=00012103 rule=0/0 hard=1/1
+   lv=4   flag=8   bits=0001802B rule=1/0 hard=1/1
+   lv=5   flag=10  bits=00030D83 rule=1/0 hard=1/1
+   lv=6   flag=12  bits=000C1095 rule=1/1 hard=1/0
+   lv=7   flag=14  bits=000C4517 rule=1/1 hard=1/1
+   lv=8   flag=16  bits=000CC2DB rule=1/1 hard=1/1
+   lv=9   flag=18  bits=00047B1B rule=1/0 hard=1/1
+   lv=10  flag=20  bits=00085A0F rule=0/0 hard=1/1
+   lv=11  flag=22  bits=000419FB rule=0/0 hard=1/1
+   lv=12  flag=24  bits=0004A937 rule=0/0 hard=1/1
+   lv=13  flag=26  bits=000306B7 rule=0/0 hard=1/1
+   lv=14  flag=28  bits=000C13B3 rule=0/0 hard=1/1
+   lv=15  flag=30  bits=000644F7 rule=0/0 hard=1/1
+   lv=16  flag=32  bits=000E8E8B rule=0/0 hard=1/1
+   lv=17  flag=34  bits=000A06EB rule=0/0 hard=1/1
+   lv=18  flag=36  bits=0000CD73 rule=0/0 hard=1/1
+   lv=19  flag=38  bits=000C76A3 rule=0/0 hard=1/1
+   lv=20  flag=40  bits=00044FA7 rule=0/0 hard=1/1
+   lv=21  flag=42  bits=000DC217 rule=0/0 hard=1/1
+   lv=22  flag=44  bits=0008B1DB rule=0/0 hard=1/1
+   lv=23  flag=46  bits=00074A4B rule=0/0 hard=1/1
+   lv=24  flag=48  bits=0004AF2B rule=0/0 hard=1/1
+selfcheck=OK

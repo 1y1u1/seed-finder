@@ -1,0 +1,43 @@
+# ---- Qt / 构建环境 (体积巨大, 不进版本库) ----
+_env/
+_tools/
+_deploy/
+_build/
+_build3/
+_build_static/
+_archive/
+_ssh/
+
+# ---- 编译中间产物与可执行文件 ----
+*.obj
+*.exe
+*.ilk
+*.pdb
+*.idb
+*.exp
+*.lib
+*.dll
+*.res
+moc_*
+qrc_*
+ui_*
+Makefile
+Makefile.*
+.qmake.stash
+*.vcxproj*
+release/
+debug/
+.sconsign/
+
+# ---- 运行期/临时产物 (只忽略根目录与构建目录下的截图, 源码目录里的资源要留) ----
+/*.png
+/*.txt
+/_bench/after*.txt
+/_gpu/release/
+
+# ---- 编辑器 / 系统 ----
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini

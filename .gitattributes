@@ -1,0 +1,7 @@
+# 源码统一用 LF 存储, 避免 Windows 上 CRLF 反复变动
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.exe binary
+*.dll binary

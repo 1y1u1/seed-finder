@@ -1,0 +1,843 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Spawn</class>
+ <widget class="QDialog" name="Spawn">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>870</width>
+    <height>440</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>870</width>
+    <height>440</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>870</width>
+    <height>440</height>
+   </size>
+  </property>
+  <property name="font">
+   <font>
+    <family>微软雅黑</family>
+    <pointsize>10</pointsize>
+   </font>
+  </property>
+  <property name="windowTitle">
+   <string>出怪设置</string>
+  </property>
+  <property name="sizeGripEnabled">
+   <bool>false</bool>
+  </property>
+  <widget class="QLabel" name="label_5">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>10</y>
+     <width>830</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <weight>75</weight>
+     <bold>true</bold>
+    </font>
+   </property>
+   <property name="text">
+    <string>同时满足以下条件时，定义为难度关</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="gridLayoutWidget_3">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>40</y>
+     <width>410</width>
+     <height>150</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_3">
+    <property name="leftMargin">
+     <number>20</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>10</number>
+    </property>
+    <property name="bottomMargin">
+     <number>10</number>
+    </property>
+    <property name="spacing">
+     <number>8</number>
+    </property>
+    <item row="0" column="0" colspan="5">
+     <widget class="QLabel" name="label_7">
+      <property name="font">
+       <font>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="text">
+       <string>必出僵尸</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QCheckBox" name="needCheckBox_1">
+      <property name="text">
+       <string>路障</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QCheckBox" name="needCheckBox_2">
+      <property name="text">
+       <string>撑杆</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="2">
+     <widget class="QCheckBox" name="needCheckBox_3">
+      <property name="text">
+       <string>铁桶</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="3">
+     <widget class="QCheckBox" name="needCheckBox_4">
+      <property name="text">
+       <string>读报</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="4">
+     <widget class="QCheckBox" name="needCheckBox_5">
+      <property name="text">
+       <string>铁门</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QCheckBox" name="needCheckBox_6">
+      <property name="text">
+       <string>橄榄</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QCheckBox" name="needCheckBox_7">
+      <property name="text">
+       <string>舞王</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="2">
+     <widget class="QCheckBox" name="needCheckBox_8">
+      <property name="text">
+       <string>潜水</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="3">
+     <widget class="QCheckBox" name="needCheckBox_9">
+      <property name="text">
+       <string>冰车</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="4">
+     <widget class="QCheckBox" name="needCheckBox_10">
+      <property name="text">
+       <string>海豚</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
+     <widget class="QCheckBox" name="needCheckBox_11">
+      <property name="text">
+       <string>小丑</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QCheckBox" name="needCheckBox_12">
+      <property name="text">
+       <string>气球</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="2">
+     <widget class="QCheckBox" name="needCheckBox_13">
+      <property name="text">
+       <string>矿工</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="3">
+     <widget class="QCheckBox" name="needCheckBox_14">
+      <property name="text">
+       <string>跳跳</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="4">
+     <widget class="QCheckBox" name="needCheckBox_15">
+      <property name="text">
+       <string>蹦极</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="0">
+     <widget class="QCheckBox" name="needCheckBox_16">
+      <property name="text">
+       <string>扶梯</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QCheckBox" name="needCheckBox_17">
+      <property name="text">
+       <string>投篮</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="2">
+     <widget class="QCheckBox" name="needCheckBox_18">
+      <property name="text">
+       <string>白眼</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="3">
+     <widget class="QCheckBox" name="needCheckBox_19">
+      <property name="text">
+       <string>红眼</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="gridLayoutWidget_4">
+   <property name="geometry">
+    <rect>
+     <x>440</x>
+     <y>40</y>
+     <width>410</width>
+     <height>150</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_4">
+    <property name="leftMargin">
+     <number>20</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>10</number>
+    </property>
+    <property name="bottomMargin">
+     <number>10</number>
+    </property>
+    <property name="spacing">
+     <number>8</number>
+    </property>
+    <item row="0" column="0" colspan="5">
+     <widget class="QLabel" name="label_8">
+      <property name="font">
+       <font>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="text">
+       <string>禁出僵尸</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QCheckBox" name="refuseCheckBox_1">
+      <property name="text">
+       <string>路障</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QCheckBox" name="refuseCheckBox_2">
+      <property name="text">
+       <string>撑杆</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="2">
+     <widget class="QCheckBox" name="refuseCheckBox_3">
+      <property name="text">
+       <string>铁桶</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="3">
+     <widget class="QCheckBox" name="refuseCheckBox_4">
+      <property name="text">
+       <string>读报</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="4">
+     <widget class="QCheckBox" name="refuseCheckBox_5">
+      <property name="text">
+       <string>铁门</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QCheckBox" name="refuseCheckBox_6">
+      <property name="text">
+       <string>橄榄</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QCheckBox" name="refuseCheckBox_7">
+      <property name="text">
+       <string>舞王</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="2">
+     <widget class="QCheckBox" name="refuseCheckBox_8">
+      <property name="text">
+       <string>潜水</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="3">
+     <widget class="QCheckBox" name="refuseCheckBox_9">
+      <property name="text">
+       <string>冰车</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="4">
+     <widget class="QCheckBox" name="refuseCheckBox_10">
+      <property name="text">
+       <string>海豚</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
+     <widget class="QCheckBox" name="refuseCheckBox_11">
+      <property name="text">
+       <string>小丑</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QCheckBox" name="refuseCheckBox_12">
+      <property name="text">
+       <string>气球</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="2">
+     <widget class="QCheckBox" name="refuseCheckBox_13">
+      <property name="text">
+       <string>矿工</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="3">
+     <widget class="QCheckBox" name="refuseCheckBox_14">
+      <property name="text">
+       <string>跳跳</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="4">
+     <widget class="QCheckBox" name="refuseCheckBox_15">
+      <property name="text">
+       <string>蹦极</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="0">
+     <widget class="QCheckBox" name="refuseCheckBox_16">
+      <property name="text">
+       <string>扶梯</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QCheckBox" name="refuseCheckBox_17">
+      <property name="text">
+       <string>投篮</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="2">
+     <widget class="QCheckBox" name="refuseCheckBox_18">
+      <property name="text">
+       <string>白眼</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="3">
+     <widget class="QCheckBox" name="refuseCheckBox_19">
+      <property name="text">
+       <string>红眼</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="gridLayoutWidget_5">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>200</y>
+     <width>410</width>
+     <height>150</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_5">
+    <property name="leftMargin">
+     <number>20</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>10</number>
+    </property>
+    <property name="bottomMargin">
+     <number>10</number>
+    </property>
+    <property name="spacing">
+     <number>8</number>
+    </property>
+    <item row="0" column="0" colspan="3">
+     <widget class="QLabel" name="label_9">
+      <property name="font">
+       <font>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="text">
+       <string>至少出</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="3">
+     <widget class="QLineEdit" name="atleast_val">
+      <property name="maximumSize">
+       <size>
+        <width>40</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="placeholderText">
+       <string/>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="4">
+     <widget class="QLabel" name="label_10">
+      <property name="text">
+       <string>种僵尸</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QCheckBox" name="atleastCheckBox_1">
+      <property name="text">
+       <string>路障</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QCheckBox" name="atleastCheckBox_2">
+      <property name="text">
+       <string>撑杆</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="2">
+     <widget class="QCheckBox" name="atleastCheckBox_3">
+      <property name="text">
+       <string>铁桶</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="3">
+     <widget class="QCheckBox" name="atleastCheckBox_4">
+      <property name="text">
+       <string>读报</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="4">
+     <widget class="QCheckBox" name="atleastCheckBox_5">
+      <property name="text">
+       <string>铁门</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QCheckBox" name="atleastCheckBox_6">
+      <property name="text">
+       <string>橄榄</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QCheckBox" name="atleastCheckBox_7">
+      <property name="text">
+       <string>舞王</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="2">
+     <widget class="QCheckBox" name="atleastCheckBox_8">
+      <property name="text">
+       <string>潜水</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="3">
+     <widget class="QCheckBox" name="atleastCheckBox_9">
+      <property name="text">
+       <string>冰车</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="4">
+     <widget class="QCheckBox" name="atleastCheckBox_10">
+      <property name="text">
+       <string>海豚</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
+     <widget class="QCheckBox" name="atleastCheckBox_11">
+      <property name="text">
+       <string>小丑</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QCheckBox" name="atleastCheckBox_12">
+      <property name="text">
+       <string>气球</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="2">
+     <widget class="QCheckBox" name="atleastCheckBox_13">
+      <property name="text">
+       <string>矿工</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="3">
+     <widget class="QCheckBox" name="atleastCheckBox_14">
+      <property name="text">
+       <string>跳跳</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="4">
+     <widget class="QCheckBox" name="atleastCheckBox_15">
+      <property name="text">
+       <string>蹦极</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="0">
+     <widget class="QCheckBox" name="atleastCheckBox_16">
+      <property name="text">
+       <string>扶梯</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QCheckBox" name="atleastCheckBox_17">
+      <property name="text">
+       <string>投篮</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="2">
+     <widget class="QCheckBox" name="atleastCheckBox_18">
+      <property name="text">
+       <string>白眼</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="3">
+     <widget class="QCheckBox" name="atleastCheckBox_19">
+      <property name="text">
+       <string>红眼</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="gridLayoutWidget_6">
+   <property name="geometry">
+    <rect>
+     <x>440</x>
+     <y>200</y>
+     <width>410</width>
+     <height>150</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_6">
+    <property name="leftMargin">
+     <number>20</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>10</number>
+    </property>
+    <property name="bottomMargin">
+     <number>10</number>
+    </property>
+    <property name="spacing">
+     <number>8</number>
+    </property>
+    <item row="0" column="0" colspan="3">
+     <widget class="QLabel" name="label_11">
+      <property name="font">
+       <font>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="text">
+       <string>至多出</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="3">
+     <widget class="QLineEdit" name="atmost_val">
+      <property name="maximumSize">
+       <size>
+        <width>40</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="4">
+     <widget class="QLabel" name="label_12">
+      <property name="text">
+       <string>种僵尸</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QCheckBox" name="atmostCheckBox_1">
+      <property name="text">
+       <string>路障</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QCheckBox" name="atmostCheckBox_2">
+      <property name="text">
+       <string>撑杆</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="2">
+     <widget class="QCheckBox" name="atmostCheckBox_3">
+      <property name="text">
+       <string>铁桶</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="3">
+     <widget class="QCheckBox" name="atmostCheckBox_4">
+      <property name="text">
+       <string>读报</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="4">
+     <widget class="QCheckBox" name="atmostCheckBox_5">
+      <property name="text">
+       <string>铁门</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QCheckBox" name="atmostCheckBox_6">
+      <property name="text">
+       <string>橄榄</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QCheckBox" name="atmostCheckBox_7">
+      <property name="text">
+       <string>舞王</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="2">
+     <widget class="QCheckBox" name="atmostCheckBox_8">
+      <property name="text">
+       <string>潜水</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="3">
+     <widget class="QCheckBox" name="atmostCheckBox_9">
+      <property name="text">
+       <string>冰车</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="4">
+     <widget class="QCheckBox" name="atmostCheckBox_10">
+      <property name="text">
+       <string>海豚</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
+     <widget class="QCheckBox" name="atmostCheckBox_11">
+      <property name="text">
+       <string>小丑</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QCheckBox" name="atmostCheckBox_12">
+      <property name="text">
+       <string>气球</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="2">
+     <widget class="QCheckBox" name="atmostCheckBox_13">
+      <property name="text">
+       <string>矿工</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="3">
+     <widget class="QCheckBox" name="atmostCheckBox_14">
+      <property name="text">
+       <string>跳跳</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="4">
+     <widget class="QCheckBox" name="atmostCheckBox_15">
+      <property name="text">
+       <string>蹦极</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="0">
+     <widget class="QCheckBox" name="atmostCheckBox_16">
+      <property name="text">
+       <string>扶梯</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QCheckBox" name="atmostCheckBox_17">
+      <property name="text">
+       <string>投篮</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="2">
+     <widget class="QCheckBox" name="atmostCheckBox_18">
+      <property name="text">
+       <string>白眼</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="3">
+     <widget class="QCheckBox" name="atmostCheckBox_19">
+      <property name="text">
+       <string>红眼</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QPushButton" name="submit">
+   <property name="geometry">
+    <rect>
+     <x>320</x>
+     <y>375</y>
+     <width>75</width>
+     <height>32</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>确定</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="cancel">
+   <property name="geometry">
+    <rect>
+     <x>470</x>
+     <y>375</y>
+     <width>75</width>
+     <height>32</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>取消</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>cancel</sender>
+   <signal>clicked()</signal>
+   <receiver>Spawn</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>507</x>
+     <y>391</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>368</x>
+     <y>462</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
