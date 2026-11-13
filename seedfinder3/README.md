@@ -149,23 +149,32 @@
 
 ```
 seedfinder3/
-├── seedengine.h/.cpp     出怪引擎: MT19937 复刻 / 规则表 / 多线程检索
-├── zombiedata.h          20 种僵尸、场景、允许表
-├── presetstore.h/.cpp    预设 JSON 读写
-├── style.h/.cpp          全局 QSS
-├── res.qrc, res/         白色对勾图标(复选框蓝底白勾)
-├── mainwindow.h/.cpp     主窗口
-├── conddialog.h/.cpp     出怪条件(四组勾选)对话框
-├── banddialog.h/.cpp     一段轮次的出怪要求编辑对话框
-├── detailview.h/.cpp     逐轮出怪表(可复用组件)
-├── detaildialog.h/.cpp   详情弹窗(内嵌 DetailView)
-├── helppages.h/.cpp      使用说明 / 关于
-├── searchworker.h/.cpp   后台线程包装
-├── main.cpp              入口 + 命令行开关
+├── SeedFinder.pro            qmake 工程 (唯一的构建入口)
+├── src/
+│   ├── main.cpp              入口 + 命令行开关
+│   ├── core/                 引擎层: 不依赖 Qt Widgets
+│   │   ├── seedengine.h/.cpp 出怪引擎: MT19937 复刻 / 规则表 / 多线程检索
+│   │   └── zombiedata.h      20 种僵尸、场景、允许表
+│   ├── app/                  应用层: 无窗口
+│   │   ├── searchworker.h/.cpp  后台线程包装
+│   │   └── presetstore.h/.cpp   预设 JSON 读写
+│   └── ui/                   界面层: 所有窗口与控件
+│       ├── mainwindow.h/.cpp    主窗口
+│       ├── style.h/.cpp         全局 QSS
+│       ├── conddialog.h/.cpp    出怪条件(四组勾选)对话框
+│       ├── banddialog.h/.cpp    一段轮次的出怪要求编辑对话框
+│       ├── detailview.h/.cpp    逐轮出怪表(可复用组件)
+│       ├── detaildialog.h/.cpp  详情弹窗(内嵌 DetailView)
+│       └── helppages.h/.cpp     使用说明 / 关于
+├── resources/
+│   ├── res.qrc               白色对勾图标(复选框蓝底白勾)
+│   ├── check_white.png
+│   └── icon.ico              应用图标
 └── tests/
-    ├── engine_test.cpp   自检 / 一致性 / 单多线程确定性 / 性能
-    ├── xcheck.cpp        与 v2.0 原版引擎逐位对拍(核心验证)
-    └── probe.cpp         各轮僵尸出现率探针
+    ├── engine_test.cpp       自检 / 一致性 / 单多线程确定性 / 性能
+    ├── xcheck.cpp            与 v2.0 原版引擎逐位对拍(核心验证)
+    ├── probe.cpp             各轮僵尸出现率探针
+    └── ref12/                1.2 版引擎副本, 供对拍用
 ```
 
 出厂测试：

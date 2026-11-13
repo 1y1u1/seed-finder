@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/">
-        <file alias="check_white.png">res/check_white.png</file>
-    </qresource>
-</RCC>

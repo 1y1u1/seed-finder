@@ -1,10 +1,10 @@
-﻿#include <QCoreApplication>
+#include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QTextStream>
 
 #include <thread>
 
-#include "../seedengine.h"
+#include "seedengine.h"
 
 int main(int argc, char **argv)
 {

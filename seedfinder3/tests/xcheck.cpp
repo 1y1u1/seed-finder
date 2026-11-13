@@ -10,7 +10,7 @@
 //             T4 v3 实际检索结果 vs 暴力枚举 (连续种子, 覆盖分桶/全局条件/多规则带)
 #include "ref12/worker.cpp"
 
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <QCoreApplication>
 #include <QRandomGenerator>

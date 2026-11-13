@@ -1,6 +1,6 @@
 // 探针: 实测每波最多同时出现多少种僵尸, 用于 checkConditions 的容量上限。
 // 用法: probe3.exe [scene]
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <QCoreApplication>
 #include <QRandomGenerator>

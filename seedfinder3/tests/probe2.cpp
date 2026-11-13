@@ -1,6 +1,6 @@
 // 探针: 实测各类僵尸在每波出现的最早波号, 用于确定 checkConditions 的拦截阈值。
 // 用法: probe2.exe [scene]
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <QCoreApplication>
 #include <QRandomGenerator>

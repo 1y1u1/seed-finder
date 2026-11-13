@@ -2,7 +2,7 @@
 //   技巧: outputSize 设成 >= 段长, 原版就会把每个 count 桶里的全部种子都存下来,
 //         于是可以还原出"每个种子 -> 匹配波数", 做逐种子比对
 #include "ref12/worker.cpp"
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <QCoreApplication>
 

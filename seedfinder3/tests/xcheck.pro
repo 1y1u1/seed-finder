@@ -10,12 +10,12 @@ TEMPLATE = app
 QMAKE_CXXFLAGS += /utf-8
 QMAKE_CXXFLAGS_RELEASE += -O2
 
-INCLUDEPATH += .. \
+INCLUDEPATH += ../src/core \
                ref12
 
 SOURCES += xcheck.cpp \
-           ../seedengine.cpp
+           ../src/core/seedengine.cpp
 
-HEADERS += ../seedengine.h \
-           ../zombiedata.h \
+HEADERS += ../src/core/seedengine.h \
+           ../src/core/zombiedata.h \
            ref12/worker.h

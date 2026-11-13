@@ -4,7 +4,7 @@
 //     B) 每个种子新建 d_page (等价于"无缓存")
 //     C) v3 WaveOracle
 #include "ref12/worker.cpp"
-#include "../seedengine.h"
+#include "seedengine.h"
 
 #include <QCoreApplication>
 #include <QRandomGenerator>

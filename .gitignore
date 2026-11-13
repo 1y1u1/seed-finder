@@ -32,6 +32,9 @@ debug/
 /*.png
 /*.txt
 
+# 本地构建脚本, 只在本机用
+/build.ps1
+
 # ---- 不进主线的目录 ----
 # _bench: 本地基准与回归工具, 只在本机用, 不上传
 # zombie_calculator-master: 第三方参考项目, 不上传
