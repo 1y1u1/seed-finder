@@ -33,7 +33,9 @@ debug/
 /*.png
 /*.txt
 /_bench/after*.txt
-/_gpu/release/
+
+# GPU 原型的源码在 gpu 分支 (main 分支只留本地编译产物, 不入库)
+/_gpu/
 
 # ---- 编辑器 / 系统 ----
 .vs/
