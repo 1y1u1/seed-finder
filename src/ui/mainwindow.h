@@ -60,6 +60,7 @@ private slots:
     void onShowAbout();
     void onSavePreset();
     void onLoadPreset();
+    void onDeletePreset();
     void onLookupSeed();
 
 private:
@@ -106,6 +107,8 @@ private:
     QString m_shotPath;      // 非空时: 查找结束自动截图并退出
     quint64 m_spanOverride = 0;   // 非 0 时: 只扫前 n 个种子(命令行截图用)
     QElapsedTimer m_runClock;     // 用于估算剩余时间
+    // 发起这次查找时"输出种子数"的取值: 结果表按它铺行, 用户事后改控件不影响已出的结果
+    int m_outputSizeAtRun = 20;
 
     // 参数区
     QSpinBox *m_uid = nullptr;

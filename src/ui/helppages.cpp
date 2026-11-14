@@ -177,7 +177,7 @@ QDialog *buildAbout(QWidget *parent)
     QLabel *title = new QLabel;
     title->setTextFormat(Qt::RichText);
     title->setText(head(QString::fromUtf8("植物大战僵尸 · 无尽种子查找器"),
-                        QString::fromUtf8("v3.0 · Qt 5.12.9 静态构建 · 不需要另装 Qt 或运行时")));
+                        QString::fromUtf8("seed-finder 2.0 · Qt 5.12.9 静态构建 · 不需要另装 Qt 或运行时")));
     lay->addWidget(title);
 
     lay->addWidget(card(
@@ -185,7 +185,7 @@ QDialog *buildAbout(QWidget *parent)
         QString::fromUtf8(
             "给《植物大战僵尸》无尽模式用的种子查找器。它把「第几 F 必须出什么僵尸」"
             "这类要求写成规则，反查满足要求的种子，省掉手动重开几十次的时间。<br>"
-            "相比 v2.0，这一版把 F 数区间和出怪条件都做成了可自由组合的形式："
+            "这一版把 F 数区间和出怪条件都做成了可自由组合的形式："
             "多段区间、每段各自的必出/禁出/至少/至多、外加跨整段的全局轮次约束。")));
 
     lay->addWidget(card(

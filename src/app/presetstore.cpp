@@ -40,7 +40,13 @@ sf::WaveCondition condFromJson(const QJsonObject &o)
 QString appDataPresetPath()
 {
     QString base = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (base.isEmpty()) base = QDir::homePath() + QStringLiteral("/.seedfinder3");
+    if (base.isEmpty()) {
+        // 2.0 用 .seedfinder2; 老版本留下的 .seedfinder3 如果存在就继续用它,
+        // 免得升级之后用户以为预设全丢了。
+        const QString oldDir = QDir::homePath() + QStringLiteral("/.seedfinder3");
+        const QString newDir = QDir::homePath() + QStringLiteral("/.seedfinder2");
+        base = QFileInfo(oldDir + QStringLiteral("/presets.json")).exists() ? oldDir : newDir;
+    }
     return base + QStringLiteral("/presets.json");
 }
 
@@ -51,13 +57,22 @@ QString exeDirPresetPath()
     return QDir(exeDir).filePath(QStringLiteral("presets.json"));
 }
 
+// 预设文件路径覆盖: 2.0 的环境变量是 SEEDFINDER2_PRESETS。
+// 老脚本里写的 SEEDFINDER3_PRESETS 仍然认, 这样升级不会把自动化弄坏。
+QString presetPathOverride()
+{
+    const QString v2 = qEnvironmentVariable("SEEDFINDER2_PRESETS");
+    if (!v2.isEmpty()) return v2;
+    return qEnvironmentVariable("SEEDFINDER3_PRESETS");
+}
+
 // 读取时的候选路径: exe 目录的 presets.json 只要"存在"就优先用, 不管它是否可写。
 // 之前读写共用同一个"可写才用"的判定, 于是把 presets.json 设成只读后,
 // 读取会跳到 AppData, 用户已有的预设看起来就凭空消失了。
 QStringList presetReadPaths()
 {
     QStringList paths;
-    const QString override_ = qEnvironmentVariable("SEEDFINDER3_PRESETS");
+    const QString override_ = presetPathOverride();
     if (!override_.isEmpty()) {
         paths << override_;
         return paths;
@@ -75,7 +90,7 @@ QString presetFilePath()
 {
     // 自检 / 自动化可以用环境变量把预设文件指到临时目录,
     // 否则 --presettest 会往用户真实的 presets.json 里塞一条"自检预设"。
-    const QString override_ = qEnvironmentVariable("SEEDFINDER3_PRESETS");
+    const QString override_ = presetPathOverride();
     if (!override_.isEmpty()) return override_;
 
     // 优先放在 exe 旁边, 做成绿色便携版; 目录不可写时才退到 AppData

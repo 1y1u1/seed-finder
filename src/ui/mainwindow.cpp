@@ -108,7 +108,7 @@ QFrame *makeCard(const QString &title, QWidget *child)
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    setWindowTitle(QString::fromUtf8("种子查找器 v3.0"));
+    setWindowTitle(QString::fromUtf8("种子查找器 2.0"));
     // 左栏定宽 kLeftWidth, 右栏定宽 kRightWidth。
     // 高度 464 = 字号 11px 后实测所需: 条件表行高提到 18 (否则文字被切),
     // 两张条件表各高 4px, 再加上进度条那一行 16px。
@@ -349,8 +349,10 @@ void MainWindow::buildMenuBar()
     QMenu *presetMenu = bar->addMenu(QString::fromUtf8("预设"));
     QAction *actSave = presetMenu->addAction(QString::fromUtf8("保存当前参数…"));
     QAction *actLoad = presetMenu->addAction(QString::fromUtf8("载入预设…"));
+    QAction *actDel = presetMenu->addAction(QString::fromUtf8("删除预设…"));
     connect(actSave, &QAction::triggered, this, &MainWindow::onSavePreset);
     connect(actLoad, &QAction::triggered, this, &MainWindow::onLoadPreset);
+    connect(actDel, &QAction::triggered, this, &MainWindow::onDeletePreset);
 
     QMenu *helpMenu = bar->addMenu(QString::fromUtf8("帮助"));
     QAction *actHowto = helpMenu->addAction(QString::fromUtf8("使用说明"));
@@ -910,6 +912,9 @@ void MainWindow::onStart()
     if (m_detailDlg) m_detailDlg->clear();
     m_progress->setValue(0);
     m_lastResult = sf::SearchResult();
+    // 记下这一次查找用的"输出种子数": 结果表按它铺行, 之后用户再去改控件
+    // 不会让已经出来的结果对不上。
+    m_outputSizeAtRun = m_outputSize ? m_outputSize->value() : 20;
     // 上一轮可能停在"继续"上, 新的一轮要从"暂停"这个初始状态开始
     m_paused = false;
     m_pausedMs = 0;
@@ -969,25 +974,34 @@ void MainWindow::onPauseToggle()
 
 void MainWindow::onProgress(int percent, quint64 scanned, quint64 qualified)
 {
-    Q_UNUSED(scanned)
-    Q_UNUSED(qualified)
-
     m_progress->setValue(percent);
+
+    // 已检查种子数与命中数: 用简洁的 "1.2 亿 / 命中 35" 形式附在后面。
+    // 全量扫描要跑几十分钟, 只报百分比时用户无法判断"到底扫了多少、找到几个",
+    // 所以这两个数在进度期间就显示出来 (结束时状态栏会被 onFinished 覆盖)。
+    QString progressText;
+    if (scanned > 0) {
+        progressText = QString::fromUtf8("（已检查 %1 个，命中 %2 个）")
+                           .arg(bigNumber(scanned))
+                           .arg(bigNumber(qualified));
+    }
 
     // 暂停时不再估时间: 已用时间停在这儿了, 报"约剩 N 秒"会一直在跳。
     if (m_paused) {
-        m_status->setText(QString::fromUtf8("已暂停（已完成 %1%）").arg(percent));
+        QString s = QString::fromUtf8("已暂停（已完成 %1%）").arg(percent);
+        s += progressText;
+        m_status->setText(s);
         return;
     }
 
-    // 状态栏只报"预测的时间进度": 全量扫描要跑几十分钟, 用户关心的是还剩多久,
-    // 种子数与命中数在结果表里都能看到, 重复显示反而把行撑长。
     if (percent >= 100) {
         m_status->setText(QString::fromUtf8("正在收尾…"));
         return;
     }
     if (!m_runClock.isValid() || percent < 1) {
-        m_status->setText(QString::fromUtf8("正在查找…已完成 %1%").arg(percent));
+        QString s = QString::fromUtf8("正在查找…已完成 %1%").arg(percent);
+        s += progressText;
+        m_status->setText(s);
         return;
     }
 
@@ -1001,7 +1015,7 @@ void MainWindow::onProgress(int percent, quint64 scanned, quint64 qualified)
     } else {
         eta = QString::fromUtf8("约剩 %1 秒").arg(int(left + 0.5));
     }
-    m_status->setText(QString::fromUtf8("已完成 %1%，%2").arg(percent).arg(eta));
+    m_status->setText(QString::fromUtf8("已完成 %1%，%2").arg(percent).arg(eta) + progressText);
 }
 
 void MainWindow::onFinished(const sf::SearchResult &result)
@@ -1126,10 +1140,13 @@ void MainWindow::onLookupSeed()
         return;
     }
 
-    // 没有条件时给个默认范围, 否则表里一行都没有
+    // 没有条件时给个默认范围, 否则表里一行都没有。
+    // 这里必须明确告诉用户"用的是默认范围", 否则很容易以为表里的轮次
+    // 就是自己在条件表里写的区间。
     int beginFlag = 0, endFlag = 0;
     effectiveRange(&beginFlag, &endFlag);
-    if (endFlag <= beginFlag) {
+    const bool defaultRange = (endFlag <= beginFlag);
+    if (defaultRange) {
         beginFlag = 0;
         endFlag = 2 * 25;   // 25 轮全查
     }
@@ -1145,10 +1162,13 @@ void MainWindow::onLookupSeed()
         sf::viewDetail(seed, m_uid->value(), m_mode->value(), currentScene(),
                        beginLevel, endLevel, rank, hard);
     showDetailWindow(seed, rows, rank, hard);
-    m_status->setText(QString::fromUtf8("已显示种子 %1 在 %2 到 %3 F 范围内的出怪")
+    m_status->setText(QString::fromUtf8("已显示种子 %1 在 %2 到 %3 F 范围内的出怪%4")
                           .arg(hex8(seed))
                           .arg(beginFlag + 1)   // F 数从 1 开始, 内部 flag 从 0 开始
-                          .arg(endFlag));
+                          .arg(endFlag)
+                          .arg(defaultRange
+                                   ? QString::fromUtf8("（还没有设置条件，按默认 25 轮显示）")
+                                   : QString()));
 }
 
 // 详情窗口是常驻的非模态窗口 (参考 1.2 版): 第一次用的时候建, 之后复用。
@@ -1178,8 +1198,10 @@ void MainWindow::fillResultTable()
 {
     const sf::SearchResult &result = m_lastResult;
 
-    // "输出种子数"是总共列多少个种子: 从满足轮数最多的档位往下取
-    const int want = m_outputSize ? m_outputSize->value() : 20;
+    // "输出种子数"是总共列多少个种子: 从满足轮数最多的档位往下取。
+    // 用发起查找时记下的值, 而不是控件当前值 —— 查找结束后用户可能再去调
+    // "输出种子数", 那时表格应该反映这次查找实际用的设置, 不该被后来的输入改掉。
+    const int want = m_outputSizeAtRun > 0 ? m_outputSizeAtRun : 20;
 
     QSignalBlocker block(m_resultTable);
     m_resultTable->setRowCount(0);
@@ -1351,12 +1373,15 @@ void MainWindow::onLoadPreset()
     QStringList names;
     for (int i = 0; i < list.size(); ++i) {
         const Preset &p = list[i];
+        // 出怪条件与全局条件都算上: 只数前者时, 一套"只有全局条件"的预设
+        // 会显示成"0 条条件", 看起来像空预设。
+        const int total = p.bands.size() + p.hard.size();
         names << QString::fromUtf8("%1　· %2 %3~%4 F（%5 条条件）")
                      .arg(p.name)
                      .arg(sceneDisplayNames().value(sceneIds().indexOf(p.scene), QString()))
                      .arg(p.beginFlag + 1)
                      .arg(p.endFlag)
-                     .arg(p.bands.size());
+                     .arg(total);
     }
 
     bool ok = false;
@@ -1367,6 +1392,55 @@ void MainWindow::onLoadPreset()
     const int idx = names.indexOf(chosen);
     if (idx < 0) return;
     applyPreset(list[idx]);
+}
+
+// 删除预设: 之前只能手改 presets.json, 普通用户根本没有这个入口。
+// 删之前要确认一次, 并且用完整路径提示删的是哪个文件。
+void MainWindow::onDeletePreset()
+{
+    QString error;
+    QVector<Preset> list = loadPresets(&error);
+    if (list.isEmpty()) {
+        QMessageBox::information(
+            this, QString::fromUtf8("没有预设"),
+            error.isEmpty() ? QString::fromUtf8("还没有保存过预设，没有可删除的。") : error);
+        return;
+    }
+
+    QStringList names;
+    for (int i = 0; i < list.size(); ++i) {
+        const Preset &p = list[i];
+        const int total = p.bands.size() + p.hard.size();
+        names << QString::fromUtf8("%1　· %2 %3~%4 F（%5 条条件）")
+                     .arg(p.name)
+                     .arg(sceneDisplayNames().value(sceneIds().indexOf(p.scene), QString()))
+                     .arg(p.beginFlag + 1)
+                     .arg(p.endFlag)
+                     .arg(total);
+    }
+
+    bool ok = false;
+    const QString chosen = QInputDialog::getItem(
+        this, QString::fromUtf8("删除预设"), QString::fromUtf8("要删除哪一套参数："),
+        names, 0, false, &ok);
+    if (!ok || chosen.isEmpty()) return;
+
+    const int idx = names.indexOf(chosen);
+    if (idx < 0) return;
+
+    const QString name = list[idx].name;
+    const auto answer = QMessageBox::question(
+        this, QString::fromUtf8("删除预设"),
+        QString::fromUtf8("确定要删除预设「%1」吗？\n\n只会删掉这一套参数，不影响其他预设。").arg(name),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (answer != QMessageBox::Yes) return;
+
+    list.removeAt(idx);
+    if (!savePresets(list, &error)) {
+        QMessageBox::warning(this, QString::fromUtf8("删除失败"), error);
+        return;
+    }
+    m_status->setText(QString::fromUtf8("已删除预设：%1").arg(name));
 }
 
 // ---------------------------------------------------------------------------

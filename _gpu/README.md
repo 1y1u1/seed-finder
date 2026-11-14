@@ -3,7 +3,7 @@
 CUDA 后端的实现与对拍程序都在这里，**已经入库**（`.gitignore` 只忽略构建产物：
 `*.obj` / `release/` / `Makefile*` / 日志）。
 
-`SeedFinder.pro` 用 `exists(_gpu/gpucuda.obj)` 探测：编出 `gpucuda.obj` 就用 GPU，
+`SeedFinder2.pro` 用 `exists(_gpu/gpucuda.obj)` 探测：编出 `gpucuda.obj` 就用 GPU，
 没编出来就走 `src/core/gpuhook.cpp` 的空实现 —— 同一份源码、同一个 exe，
 不需要维护两套代码，也不需要出两个可执行文件。
 
@@ -14,7 +14,7 @@ CUDA 后端已经接进主程序：
 - `src/core/gpuhook.h/.cpp` —— 后端抽象，纯 C++（不含 Qt、不含 CUDA 头）。
   没编 CUDA 时 `sf::createGpuBackend()` 返回 `nullptr`，引擎自动走 CPU，
   11 个测试程序的行为完全不变。
-- `SeedFinder.pro` 末尾用 `exists(_gpu/gpucuda.obj)` 探测，存在才定义
+- `SeedFinder2.pro` 末尾用 `exists(_gpu/gpucuda.obj)` 探测，存在才定义
   `SF_WITH_CUDA` 并链接 `gpucuda_backend.cpp` + `cudart`。
 - `sf::SearchSpec::gpu`（默认 1）。`Searcher::run` 先把每轮条件按轮连续展开
   （CPU/GPU 共用），再按块调后端 `scan()`。界面「用 GPU 加速」复选框和

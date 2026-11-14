@@ -181,13 +181,13 @@ QTableCornerButton::section {
 }
 
 /* ---------- 进度条 ---------- */
+/* 高度交给代码控制 (mainwindow 里的 setFixedHeight): QSS 的 max-height 会盖掉
+   setFixedHeight, 两处各写一个值只会让人以为改了没用。 */
 QProgressBar {
     border: 1px solid #dcdcdc;
     border-radius: 0;
     background: #f0f0f0;
     text-align: center;
-    min-height: 14px;
-    max-height: 14px;
     color: #111111;
     font-size: 11px;
 }

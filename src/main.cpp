@@ -32,7 +32,6 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     a.setApplicationName(QString::fromUtf8("种子查找器"));
     a.setOrganizationName(QString::fromUtf8("PvZ Seed Finder"));
-
     // 跨线程信号必须注册元类型, 否则 queued connection 会静默丢弃 SearchResult
     qRegisterMetaType<sf::SearchResult>("sf::SearchResult");
 
@@ -64,9 +63,9 @@ int main(int argc, char *argv[])
         // 自检不能碰用户真实的 presets.json (原来的实现会往里追加一条"自检预设"),
         // 用环境变量把路径重定向到临时目录。
         const QString tmpPath = QDir(QDir::tempPath())
-                                    .filePath(QStringLiteral("seedfinder3-presettest.json"));
+                                    .filePath(QStringLiteral("seedfinder2-presettest.json"));
         QFile::remove(tmpPath);
-        qputenv("SEEDFINDER3_PRESETS", tmpPath.toLocal8Bit());
+        qputenv("SEEDFINDER2_PRESETS", tmpPath.toLocal8Bit());
 
         Preset p;
         p.name = QString::fromUtf8("自检预设");

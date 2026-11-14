@@ -1,7 +1,7 @@
 QT += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-TARGET = SeedFinder3
+TARGET = SeedFinder2
 TEMPLATE = app
 
 CONFIG += c++11
@@ -50,7 +50,8 @@ RC_ICONS = resources/icon.ico
 RESOURCES += resources/res.qrc
 
 # ---- 可选的 CUDA 后端 ----
-# _gpu/ 只存在本机 (不进版本库), 所以这里用 exists() 探测:
+# _gpu/ 的 CUDA 源码是入库的, 但 gpucuda.obj 这类编译产物不入库,
+# 所以这里仍然用 exists() 探测:
 #   有 gpucuda.obj  -> 定义 SF_WITH_CUDA, 链接 CUDA 后端, 程序启动时自动启用 GPU
 #   没有            -> gpuhook.cpp 提供返回 nullptr 的兜底实现, 程序纯 CPU 运行
 # gpucuda.obj 由 _gpu\build_cuda_test.bat (或 build.ps1) 用 nvcc 生成, 不能直接写 .cu。
