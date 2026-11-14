@@ -423,9 +423,11 @@ void testConditionValidation()
         c.beginFlag = 2; c.endFlag = 60;
         c.cond.needMask = (1u << Z_BUCKET); good << c;
     }
-    {   // 第 1 轮 2 种非固定僵尸: 正好用满名额
+    {   // 第 1 轮(F3~4F) 2 种非固定僵尸: 正好用满名额
+        //     注意 beginFlag 必须是 2 (level 1); beginFlag=0 是 F1~2F, 界面上填不出来,
+        //     那一轮只有 1 个新增格位。
         GoodCase c; c.name = QStringLiteral("第 1 轮必出 2 种非固定僵尸");
-        c.beginFlag = 0; c.endFlag = 2;
+        c.beginFlag = 2; c.endFlag = 4;
         c.cond.needMask = (1u << Z_POLE) | (1u << Z_BUCKET); good << c;
     }
     {   // 禁出 3 种, 候选仍足够

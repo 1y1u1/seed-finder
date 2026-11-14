@@ -518,15 +518,18 @@ QString checkBandLocal(const RuleBand &b, int scene, const QString &kind)
     }
 
     // 3) 必出 / 至少数量的要求超过了这一轮能出现的僵尸总数
-    //    每轮构成 (probe3 实测): 第 1 轮恒为 {普僵, 路障, 铁桶} 3 种;
-    //    第 n 轮(n>=2) = 普僵(固定) + 路障/读报之一(固定) + n 个新增,
-    //    第 9 轮起新增封顶 9 (总 11 种封顶)。
-    //    条件对这一段的每一轮都要成立, 而新增名额随轮次单调不减,
+    //    每轮构成 (用 1.2 原版 d_page 实测, 五场景一致):
+    //      第 ℓ 轮固定 普僵 + 路障/读报之一, 之后是 ℓ+1 个格位, 其中末尾两个
+    //      可能是空槽 (24/25, 占格但不加种类), 所以
+    //        种类数下限 min(ℓ+1, 9), 上限 min(ℓ+3, 11)。
+    //    扣掉必然出现的普僵与路障/读报, 非固定种类最多
+    //      min(ℓ+3, 11) - 2 = min(ℓ+1, 9) 种。
+    //    条件对这一段的每一轮都要成立, 而格位随轮次单调不减,
     //    所以卡住的是这一段最早的那一轮 —— 必须按它来算, 不能按最晚的。
     if (b.cond.needTotal > 0 || b.cond.atLeast > 0) {
         const int want = std::max(b.cond.needTotal, b.cond.atLeast);
         const int firstNeededRound = std::max(firstRound, b.beginLevel() + 1);
-        int extraSlots = (firstNeededRound <= 1) ? 2 : std::min(firstNeededRound, 9);
+        int extraSlots = std::min(firstNeededRound, 9);
         // 场景总共能出的僵尸种类有限, 扣掉固定 2 种后是新增的天花板
         const int sceneKinds = popcnt(sceneZombieMask(scene) & ~1u
                                       & ~((1u << Z_CONE) | (1u << Z_NEWS)));
@@ -542,17 +545,21 @@ QString checkBandLocal(const RuleBand &b, int scene, const QString &kind)
         }
     }
 
-    // 4) 禁出的种类太多, 这一轮要求的名额填不满。
-    //    与上面一条方向相反: 新增名额随轮次单调不减, 所以"候选不够"卡住的是
+    // 4) 禁出的种类太多, 这一段最晚那一轮需要的种类凑不出来。
+    //    与上面一条方向相反: 每一轮的格位随轮次单调不减, 所以"候选不够"卡住的是
     //    这一段最晚的那一轮 —— 必须按它来算。
+    //
+    //    门槛必须取**能证明的**下限。取高了就会把"很难但确实有解"的条件误判成
+    //    无解 (3~4 F 禁出 16 种那条就是这么被误拦的, 用 1.2 原版实测五场景都有解)。
+    //    1.2 原版 d_page 逐轮统计出来的种类数下限是 min(ℓ+1, 9):
+    //      ℓ=1 时 2 种, ℓ=2 时 3 种 …… 第 8 轮起固定 9 种。
+    //    所以最晚那一轮禁出之后, 本场景还能出的种类数少于这个下限才是真无解。
     {
-        const int lastRound = std::max(firstRound, (b.endFlag - 1) / 2 + 1);
-        int extraSlots = (lastRound <= 1) ? 0 : std::min(lastRound, 9);
-        const quint32 fixedMask = (1u << Z_REGULAR) | (1u << Z_CONE) | (1u << Z_NEWS);
-        const quint32 pool = sceneZombieMask(scene) & ~b.cond.refuseMask & ~fixedMask
-                             & ((1u << Z_COUNT) - 1u);
-        // 每轮固定要放 普僵 + 路障/读报之一, 加上 extraSlots 个新增
-        if (popcnt(pool) < extraSlots) {
+        const int lastLevel = std::max(1, std::min(b.endLevel() - 1, 9));
+        const int minKinds = std::min(lastLevel + 1, 9);
+        const quint32 avail = sceneZombieMask(scene) & ~b.cond.refuseMask
+                              & ((1u << Z_COUNT) - 1u);
+        if (popcnt(avail) < minKinds) {
             return QString::fromUtf8("%1 本轮禁出的僵尸太多").arg(where);
         }
     }

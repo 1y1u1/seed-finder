@@ -40,9 +40,12 @@ namespace {
 const int kOuterBegin = 2;      // F 3 起: 第 1 ~ 2 轮固定是普僵+路障/读报, 查不到别的
 const int kOuterEnd = 10000;
 
-// 左栏定宽。PE/FE 是僵尸种类最多的场景 (20 种), 条件列要能一行放下
-// "必出 " + 20 个单字简称, 否则最长的那条会被截成 "…"
-const int kLeftWidth = 400;
+// 左栏定宽。只按内容算, 不留多余空白:
+//   参数卡  = 四个标签 + 两个数字框 + 一个场景框 (按最长的 "MGE/AQE" 定宽)
+//   条件表  = 范围列 88 + "必出 " + 19 个单字简称
+// 两边取大的那个, 再加卡片边框与滚动条的位置。参数控件自己贴合内容,
+// 不再靠网格的列拉伸撑开 —— 那样窗口一变宽, 框就跟着变宽, 看着很松。
+const int kLeftWidth = 352;
 
 // 范围列只放 "11 到 40 F" 这种短串, 给死宽度免得挤压条件列
 const int kRangeColumnWidth = 88;
@@ -52,12 +55,29 @@ const int kRangeColumnWidth = 88;
 // 的内边距, 18 刚好放得下且不切字。表头 20 同理 (上下各 2px 内边距)。
 const int kConditionRowHeight = 18;
 const int kConditionHeaderHeight = 20;
+// 可见区正好 3 行 (3 * 18 = 54) + 表头 20 + 上下边框 2 = 76。
+// 以前这里是 +4, 可见区多出 2px, 第 4 行会露出半行字, 看着像被切断了。
 const int kConditionTableHeight =
-    kConditionHeaderHeight + 3 * kConditionRowHeight + 2 + 2;
+    kConditionHeaderHeight + 3 * kConditionRowHeight + 2;
 
 // 右栏宽度。只剩"种子输入框 104 + 查看出怪 ~90"这一行了, 240 就够。
 // 再宽就是给结果表留白: 种子列是 Stretch, 多出来的宽度全变空白。
 const int kRightWidth = 240;
+
+// 条件表: 默认 sizeHint 是按内容算的, 3 行条件时只有 78px 高, 但 QTableWidget
+// 自带的 sizeHint 是 256x192, 布局会照着它给高度 —— 主窗口一开就冒出竖向滚动条。
+// 这里把 sizeHint 压到"最小时该有的高度", 再由 Expanding 策略跟着窗口一起长。
+class ConditionTable : public QTableWidget
+{
+public:
+    explicit ConditionTable(int minHeight, QWidget *parent = nullptr)
+        : QTableWidget(parent), m_minHeight(minHeight) {}
+
+    QSize sizeHint() const override { return QSize(0, m_minHeight); }
+
+private:
+    int m_minHeight;
+};
 
 QString hex8(quint32 v)
 {
@@ -109,12 +129,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowTitle(QString::fromUtf8("种子查找器 2.0"));
-    // 左栏定宽 kLeftWidth, 右栏定宽 kRightWidth。
-    // 高度 464 = 字号 11px 后实测所需: 条件表行高提到 18 (否则文字被切),
-    // 两张条件表各高 4px, 再加上进度条那一行 16px。
-    // 高度以实测的 hint 为准, 不能用估算 —— 差 1px 就会出滚动条。
-    resize(kLeftWidth + kRightWidth + 32, 464);
-    setMinimumSize(kLeftWidth + kRightWidth + 24, 464);
+    // 左右两栏都是定宽 (见 buildUi), 所以默认宽度 = 两栏 + 边距 + 间距 + 窗口边框。
+    // 高度按实测的最小可用高度给: 参数卡三行 (用户/存档、场景/输出、GPU 开关)
+    // + 状态两行 + 进度条 + 按钮行, 再加两张条件表各 3 行可见的空间。
+    // 这些数字都会被 tests/uiprobe 量出来核对, 不能凭估算写死。
+    resize(kLeftWidth + kRightWidth + 32, 500);
+    setMinimumSize(kLeftWidth + kRightWidth + 32, 500);
     buildUi();
 
     // 启动时不预置任何出怪条件: 用户自己从"添加"开始加,
@@ -220,8 +240,8 @@ bool MainWindow::setBadCase(int index)
         b.beginFlag = 2; b.endFlag = 4;
         b.cond.needMask = (1u << Z_ZOMBONI);
         break;
-    case 2:     // 第 1 轮路障读报同时禁出
-        b.beginFlag = 0; b.endFlag = 2;
+    case 2:     // 第 2 轮路障读报同时禁出 (任意范围都非法, 这里用界面上填得出的范围)
+        b.beginFlag = 2; b.endFlag = 4;
         b.cond.refuseMask = (1u << Z_CONE) | (1u << Z_NEWS);
         break;
     case 3:     // 早期轮要求种类数超过上限 (第 2 轮最多 4 种)
@@ -242,12 +262,12 @@ bool MainWindow::setBadCase(int index)
         b.cond.needMask = (1u << Z_JACK);
         b.cond.refuseMask = (1u << Z_JACK);
         break;
-    case 6:     // 第 1 轮要求同轮出现 3 种非固定僵尸: 第 1 轮只有 2 个新增名额
-        // (原来这条测的是"勾了本场景不会出现的僵尸", 但按需求这类僵尸在条件
-        //  对话框里根本选不到, 引擎不再单独拦截, 换成同类的名额超限用例)
-        b.beginFlag = 0; b.endFlag = 2;
-        b.cond.needMask = (1u << Z_POLE) | (1u << Z_BUCKET) | (1u << Z_DOOR);
-        b.cond.needTotal = 3;
+    case 6:     // 「至少出」名额超限: 第 1 轮 (F 3~4) 只有 2 个新增格
+        // 走的是 atLeast 分支 (case 9 走 needMask 分支), 两条路都要拦。
+        b.beginFlag = 2; b.endFlag = 4;
+        b.cond.atLeastMask = (1u << Z_POLE) | (1u << Z_BUCKET) | (1u << Z_DOOR)
+                             | (1u << Z_GARG);
+        b.cond.atLeast = 3;
         break;
     case 7: {   // 跨段矛盾: 一段必出小丑, 重叠段禁出小丑
         b.beginFlag = 10; b.endFlag = 16;
@@ -266,7 +286,7 @@ bool MainWindow::setBadCase(int index)
         b.beginFlag = 10; b.endFlag = 16;
         b.cond.refuseMask = (1u << Z_CONE) | (1u << Z_NEWS);
         break;
-    case 9:     // 早期轮必出 3 种非固定僵尸: 第 2 轮只有 2 个新增名额
+    case 9:     // 必出 3 种非固定僵尸: 第 2 轮 (F 3~4) 只有 2 个新增名额
         b.beginFlag = 2; b.endFlag = 4;
         b.cond.needMask = (1u << Z_POLE) | (1u << Z_BUCKET) | (1u << Z_DOOR);
         b.cond.needTotal = 3;
@@ -299,44 +319,41 @@ void MainWindow::buildUi()
     root->setSpacing(0);
 
     QWidget *body = new QWidget(central);
-    body->setContentsMargins(0, 0, 0, 0);
     QHBoxLayout *bodyLay = new QHBoxLayout(body);
     bodyLay->setContentsMargins(10, 10, 10, 10);
-    bodyLay->setSpacing(10);
+    bodyLay->setSpacing(6);
 
     // ---- 左栏 ----
+    // 两张条件卡各占一份纵向伸缩量: 窗口拉高时它们平分多出来的高度,
+    // 而不是把高度全留给空白 (以前左栏底部一条大留白, 卡片本身不动)。
     QWidget *leftInner = new QWidget;
     QVBoxLayout *leftLay = new QVBoxLayout(leftInner);
-    leftLay->setContentsMargins(0, 0, 4, 0);
+    leftLay->setContentsMargins(0, 0, 0, 0);
     leftLay->setSpacing(5);
     leftLay->addWidget(buildParamCard());
-    leftLay->addWidget(buildBandCard());
-    leftLay->addWidget(buildGlobalCard());
-    leftLay->addStretch(1);
-    for (int i = 0; i < leftLay->count(); ++i) {
-        if (QWidget *card = leftLay->itemAt(i)->widget())
-            card->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    }
+    leftLay->addWidget(buildBandCard(), 1);
+    leftLay->addWidget(buildGlobalCard(), 1);
 
     QScrollArea *scroll = new QScrollArea;
     scroll->setWidget(leftInner);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     // 左栏定宽: 按最多种僵尸的场景 (PE/FE 的 20 种) 的单字简称算出来,
     // 保证"必出 20 个字"这种最长的一行不会被截断。
     scroll->setFixedWidth(kLeftWidth);
 
     QWidget *right = buildResultCard();
+    // 右栏也定宽: 窗口横向拉宽 (含全屏) 时不再把结果表和左栏卡片一起拉宽,
+    // 多出来的宽度全部变成左右边距, 内容整体居中。
+    right->setFixedWidth(kRightWidth);
 
-    // 左右两栏宽度固定 (左栏按最多的 20 种僵尸算), 不提供拖动分隔条
-    QHBoxLayout *split = new QHBoxLayout;
-    split->setContentsMargins(0, 0, 0, 0);
-    split->setSpacing(6);
-    split->addWidget(scroll, 0);
-    split->addWidget(right, 1);
+    bodyLay->addStretch(1);
+    bodyLay->addWidget(scroll);
+    bodyLay->addWidget(right);
+    bodyLay->addStretch(1);
 
-    bodyLay->addLayout(split);
     root->addWidget(body, 1);
     setCentralWidget(central);
 }
@@ -376,8 +393,7 @@ QWidget *MainWindow::buildParamCard()
     };
 
     int r = 0;
-    // 第一行: 用户编号 / 存档编号 / 场景。
-    // 场景原本独占一行, 跟这两项并排之后参数卡少一行, 主界面的高度才压得下来。
+    // 第一行: 用户编号 / 存档编号。
     addLabel(r, 0, QString::fromUtf8("用户编号"));
     m_uid = new QSpinBox;
     m_uid->setRange(1, 99);
@@ -388,33 +404,61 @@ QWidget *MainWindow::buildParamCard()
     m_mode->setRange(1, 99);
     m_mode->setValue(13);
     g->addWidget(m_mode, r, 3);
-    addLabel(r, 4, QString::fromUtf8("场景"));
-    m_scene = new QComboBox;
-    m_scene->addItems(sceneDisplayNames());
-    m_scene->setCurrentIndex(2);
-    g->addWidget(m_scene, r, 5);
-    connect(m_scene, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            &MainWindow::onSceneChanged);
     ++r;
 
-    // 第二行: 输出种子数 + GPU 开关
+    // 第二行: 输出种子数 / 场景。
+    // 场景框是最宽的一格, 把它和数字框放在同一列 (第 3 列),
+    // 第一行就不会出现"数字框只占一小格、右边空一大截"的松垮感。
     addLabel(r, 0, QString::fromUtf8("输出种子数"));
     m_outputSize = new QSpinBox;
     m_outputSize->setRange(1, 500);
     m_outputSize->setValue(20);
     g->addWidget(m_outputSize, r, 1);
+    addLabel(r, 2, QString::fromUtf8("场景"));
+    m_scene = new QComboBox;
+    m_scene->addItems(sceneDisplayNames());
+    m_scene->setCurrentIndex(2);
+    g->addWidget(m_scene, r, 3);
+    connect(m_scene, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &MainWindow::onSceneChanged);
+    ++r;
 
+    // 第三行: GPU 开关, 独占一行。
     // GPU 开关: 只有真的编进了 CUDA 后端并且有可用设备时才可选,
     // 否则置灰勾不上 (此时引擎本来也只会走 CPU)。
     m_useGpu = new QCheckBox(QString::fromUtf8("用 GPU 加速"));
     m_useGpu->setChecked(sf::gpuBackendReady());
     m_useGpu->setEnabled(sf::gpuBackendReady());
-    g->addWidget(m_useGpu, r, 2, 1, 4);
+    g->addWidget(m_useGpu, r, 0, 1, 4);
     ++r;
 
-    g->setColumnStretch(1, 1);
-    g->setColumnStretch(3, 1);
-    g->setColumnStretch(5, 2);
+    // 三个数字框与场景框的宽度都取控件自己的最小可用宽度,
+    // 只留左右各 2px 余量给极少数 Windows 主题的边框差异。
+    // 量之前必须先 ensurePolished(): 样式表 (padding / drop-down 宽度) 是在
+    // polish 时才套上去的, 不先 polish 量到的是没算内边距的旧值,
+    // 场景框会被多算十几像素 (实测 131 而不是 117)。
+    for (QWidget *w : {static_cast<QWidget *>(m_uid), static_cast<QWidget *>(m_mode),
+                       static_cast<QWidget *>(m_outputSize), static_cast<QWidget *>(m_scene)}) {
+        w->ensurePolished();
+    }
+    // 同一列里的控件取同一个宽度, 右边缘才对得齐:
+    //   第 1 列 (用户编号/输出种子数) 取两个数字框里更宽的那个,
+    //   第 3 列 (存档编号/场景) 取场景框的宽度 (它天生最宽)。
+    // 否则会出现"存档编号的框比下面的场景框窄一截"这种参差。
+    int col1 = 0;
+    for (QSpinBox *sp : {m_uid, m_outputSize}) {
+        sp->ensurePolished();
+        col1 = std::max(col1, sp->sizeHint().width() + 2);
+    }
+    const int col3 = m_scene->minimumSizeHint().width() + 2;
+    for (QWidget *w : {static_cast<QWidget *>(m_uid), static_cast<QWidget *>(m_outputSize)}) {
+        w->setFixedWidth(col1);
+        w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    }
+    for (QWidget *w : {static_cast<QWidget *>(m_mode), static_cast<QWidget *>(m_scene)}) {
+        w->setFixedWidth(col3);
+        w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    }
 
     // 状态文字: 按 v1.2 的布局放在「输出种子数」和「开始查找」之间。
     m_status = new QLabel(QString::fromUtf8("就绪"));
@@ -473,7 +517,7 @@ QWidget *MainWindow::buildBandCard()
     lay->setContentsMargins(0, 0, 0, 0);
     lay->setSpacing(4);
 
-    m_bandTable = new QTableWidget;
+    m_bandTable = new ConditionTable(kConditionTableHeight);
     m_bandTable->setColumnCount(2);
     m_bandTable->setHorizontalHeaderLabels(QStringList()
         << QString::fromUtf8("范围") << QString::fromUtf8("条件"));
@@ -490,9 +534,15 @@ QWidget *MainWindow::buildBandCard()
     // 表头也写死高度: QSS 里 QHeaderView::section 有 2px 上下内边距,
     // 不设死的话光表头就占 22px, 3 行可见就要多占几像素高度。
     m_bandTable->horizontalHeader()->setFixedHeight(kConditionHeaderHeight);
-    // 两张条件表高度一致 (表头 + 3 行), 左右两块卡片看起来才整齐
-    m_bandTable->setFixedHeight(kConditionTableHeight);
-    m_bandTable->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    // 竖向滚动条常驻。Qt 在滚动条"按需出现"时会先按无滚动条的宽度算表头,
+    // 等滚动条真的出现, 表头右侧就有一小截被滚动条压住 (截图里看得很清楚)。
+    // 常驻之后宽度恒定, 表头永远完整, 顺带也避免了"行数跨过 3 行时整表横向抖一下"。
+    m_bandTable->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    // 两张条件表高度一致 (表头 + 3 行), 左右两块卡片看起来才整齐。
+    // 这里用最小高度而不是固定高度: 主窗口纵向拉高时, 两张表跟着长高、
+    // 多显示几行, 而不是把多出来的高度全变成卡片下方的空白。
+    m_bandTable->setMinimumHeight(kConditionTableHeight);
+    m_bandTable->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     connect(m_bandTable, &QTableWidget::doubleClicked, this, [this](const QModelIndex &) {
         onEditBand();
     });
@@ -521,7 +571,7 @@ QWidget *MainWindow::buildGlobalCard()
     lay->setContentsMargins(0, 0, 0, 0);
     lay->setSpacing(4);
 
-    m_globalTable = new QTableWidget;
+    m_globalTable = new ConditionTable(kConditionTableHeight);
     m_globalTable->setColumnCount(2);
     m_globalTable->setHorizontalHeaderLabels(QStringList()
         << QString::fromUtf8("范围") << QString::fromUtf8("条件"));
@@ -536,13 +586,16 @@ QWidget *MainWindow::buildGlobalCard()
     m_globalTable->setColumnWidth(0, kRangeColumnWidth);
     m_globalTable->verticalHeader()->setDefaultSectionSize(kConditionRowHeight);
     m_globalTable->horizontalHeader()->setFixedHeight(kConditionHeaderHeight);
-    // 与「出怪条件」表同样高度和尺寸策略, 两块卡片对齐
-    m_globalTable->setFixedHeight(kConditionTableHeight);
-    m_globalTable->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    // 与「出怪条件」表一致: 竖向滚动条常驻, 表头不被压; 高度随窗口拉伸。
+    m_globalTable->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    // 与「出怪条件」表同样高度和尺寸策略, 两块卡片对齐; 高度随条件条数增长,
+    // 竖向拉高窗口时两张卡平分多出来的高度。
+    m_globalTable->setMinimumHeight(kConditionTableHeight);
+    m_globalTable->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     connect(m_globalTable, &QTableWidget::doubleClicked, this, [this](const QModelIndex &) {
         onEditGlobal();
     });
-    lay->addWidget(m_globalTable);
+    lay->addWidget(m_globalTable, 1);
 
     QHBoxLayout *row = new QHBoxLayout;
     row->setSpacing(6);
@@ -1190,7 +1243,10 @@ void MainWindow::onSeedPicked()
     if (row < 0) return;
     QTableWidgetItem *it = m_resultTable->item(row, 0);
     if (!it) return;
-    showDetailFor(quint32(it->text().toUInt(nullptr, 16)));
+    // 单击只把种子填进右上角的输入框, 不弹详情窗口。
+    // 以前是选中就弹 —— 翻结果列表时每点一行就蹦一个窗口, 很挡视线;
+    // 想看详情可以再点一次「查看出怪」, 或者双击这一行。
+    if (m_seedInput) m_seedInput->setText(it->text());
 }
 
 // 把 m_lastResult 铺进结果表

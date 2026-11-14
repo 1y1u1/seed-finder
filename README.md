@@ -155,9 +155,26 @@ release\suite.exe --quick  :: 跳过耗时用例
 
 全套 163 项断言，正常约 2~4 秒，失败返回非零退出码，可直接接进 CI。
 
-`tests/` 里其余程序是开发期的探针与对拍工具：
-`xcheck`（与原版实现四段交叉验证）、`engine_test`（引擎回归）、
-`diag*`（差异定位）、`probe*`（出怪结构统计）。
+除 `suite` 之外，`tests/` 里还有几个专门针对单一问题的验证程序，
+它们都以 1.2 原版的分页实现为基准，不自己造第二套枚举器：
+
+| 程序 | 作用 |
+|---|---|
+| `ruleaudit` | 枚举约 24 万条条件组合，找出「校验器说无解、实际有解」的误报 |
+| `rulesprobe` | 用原版 `single_seed` 逐轮统计出怪结构，核对门槛公式 |
+| `uiprobe` | 量主窗口各控件的实际几何，核对定宽 / 居中 / 滚动条位置 |
+| `xcheck` | 与原版实现四段交叉验证 |
+| `engine_test` | 引擎回归（自检 / 一致性 / 确定性 / 性能） |
+| `diag*`、`probe*` | 开发期的差异定位与出怪结构统计 |
+
+这几个程序不在 `build.ps1` 的目标表里，单独编译即可：
+
+```bat
+cd _build3\tests\ruleaudit
+qmake ..\..\..\tests\ruleaudit.pro -spec win32-msvc "CONFIG+=release"
+nmake release
+release\ruleaudit.exe
+```
 
 ---
 
